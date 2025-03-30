@@ -1,2 +1,8 @@
-/* You can add custom styles here */
+.App {
+  text-align: center;
+  padding: 2rem;
+}
 
+h1 {
+  color: #2B4C38;
+}
