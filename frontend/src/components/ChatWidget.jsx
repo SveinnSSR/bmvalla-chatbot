@@ -115,21 +115,33 @@ const ChatWidget = ({
   // Function to determine if a message should show feedback options
   const shouldShowFeedback = (message) => {
     // Skip feedback for welcome messages
-    if (message.content.includes("Ég er spjallrofi BM Vallá")) {
-      return false;
-    }
-    
-    // Skip feedback for simple acknowledgment messages
-    if (message.content.length < 70) {
+    if (
+      message.content.includes("Hæ! Ég er gervigreindar") || 
+      message.content.includes("Hvernig get ég aðstoðað þig") ||
+      message.id === 'welcome-msg-' + Date.now().toString().slice(0, -3) // Approximate ID match for welcome
+    ) {
       return false;
     }
     
     // Skip feedback for error messages
-    if (message.content.includes("Því miður kom upp villa")) {
+    if (
+      message.content.includes("Því miður kom upp villa") || 
+      message.content.includes("reyndu aftur síðar")
+    ) {
       return false;
     }
     
-    // Show feedback for all substantive responses
+    // Skip feedback for very short responses (less than 100 characters)
+    if (message.content.length < 100) {
+      return false;
+    }
+    
+    // Skip feedback for first message of conversation
+    if (message.id.includes('welcome-msg')) {
+      return false;
+    }
+    
+    // Show feedback for all other substantive responses
     return true;
   };
 
