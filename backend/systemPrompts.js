@@ -25,41 +25,34 @@ Persónuleiki þinn:
 }
 
 /**
- * Returns structured response instructions to optimize answer formatting
+ * Returns simplified response instructions to optimize answer formatting
  * @returns {string} - Structured response instructions
  */
 export function getStructuredResponseInstructions() {
   return `
-Mikilvægt: Svörin þín verða að vera hnitmiðuð og skýr. Formatta svör þín á eftirfarandi hátt:
+Mikilvægt: Svörin þín verða að vera hnitmiðuð, skýr og á réttri íslensku.
 
-1. Byrjaðu með beint svar við spurningunni (1-2 setningar).
+1. Byrjaðu með beint svar við spurningunni í 1-2 setningum.
 
-2. Skipulagðu ítarlegri upplýsingar:
-   - Notaðu **feitletraðan texta** fyrir fyrirsagnir
-   - Skrifaðu stuttar og skýrar málsgreinar
-   - Ekki hafa mikil bil á milli málsgreina
+2. Notaðu einfalda uppsetningu:
+   - **Feitletraðan texta** fyrir fyrirsagnir (ekki nota # merki)
+   - Stuttar málsgreinar
+   - *Punktalista (stjörnumerkt)* fyrir valkosti
+   - Númeraða lista (1. 2. 3.) BARA fyrir skref í ákveðinni röð
 
-3. Fyrir lista:
-   - Notaðu * fyrir óraðaða lista
-   - Notaðu 1. 2. 3. fyrir númeraða lista (notað þegar skref eru í ákveðinni röð)
-   - Haltu listaatriðum stuttum
+3. Notaðu viðeigandi emoji til að gera svarið lifandi:
+   - Byggingartengd: 🏗️ 🏢 🏠 🏡 🧱 🔨 🔧 🛠️ 🧰 📏 📐
+   - Garð- og landslagstengd: 🌿 🌱 🌳 🌲 🌷 🏞️
+   - Þjónustutengd: 👷 🤝 📞 📝 ✅ ✨
+   - Útreikningstengd: 🧮 📊 💰 💲
 
-4. Fyrir útreikninga:
-   - Sýndu skýra útreikninga
-   - Útskýrðu niðurstöðuna á einfaldan hátt
+4. AÐGÁT MEÐ ÍSLENSKAN TEXTA:
+   - Notaðu réttan íslenskan staf "ð" (eth), ALDREI "đ"
+   - Notaðu réttan íslenskan staf "þ" (thorn), ALDREI "ţ"
+   - Passaðu orðabilin, t.d. "veröndin þín" (EKKI "verandaþitt")
+   - Forðastu að segja "viargangi" - notaðu "viðbótarefni" eða "aukahellur"
 
-5. Í lokin:
-   - Bjóddu upp á eina tengda spurningu
-
-6. MIKILVÆGT - RÉTT NOTKUN ÍSLENSKRA STAFA:
-   - Notaðu alltaf réttan íslenskan staf "ð" (eth), aldrei erlenda stafi eins og "đ"
-   - Notaðu alltaf réttan íslenskan staf "þ" (thorn), aldrei erlenda stafi eins og "ţ"
-   - Gakktu úr skugga um að orð séu aðskilin með bilum
-   - Gakktu úr skugga um að setningar séu á réttu íslensku málfræðilega séð
-
-7. Notaðu 1-2 viðeigandi emoji til að gera textann aðlaðandi (t.d. við fyrirsagnir eða í lokin).
-
-Haltu svörum þínum hnitmiðuðum, 200-250 orð er ágætis lengd. Mundu að notandinn getur alltaf spurt nánar ef hann vill frekari upplýsingar.`;
+Haltu svörum þínum undir 200-250 orðum nema beðið sé um ítarlegri upplýsingar. Viðskiptavinurinn getur alltaf spurt frekar ef hann vill vita meira.`;
 }
 
 /**
@@ -105,16 +98,19 @@ export function createCalculationPrompt(calculationResult) {
 export function getEmojiSuggestions(messageType) {
   const suggestions = {
     product: {
-      hellur: ['🧱', '🛣️', '🏡', '🏗️'],
-      steypa: ['🏢', '🏗️', '🧪', '🌱'],
-      sandur: ['⏳', '🏖️', '🧱'],
-      huseiningar: ['🏠', '🏗️', '🏢', '🧰'],
-      steyptarEiningar: ['🏛️', '🗑️', '🪑', '🚧']
+      hellur: ['🧱', '🛣️', '🏡', '🏗️', '🌿'],
+      steypa: ['🏢', '🏗️', '🧪', '🌱', '🧱'],
+      sandur: ['⏳', '🏖️', '🧱', '🌿'],
+      huseiningar: ['🏠', '🏗️', '🏢', '🧰', '🛠️'],
+      steyptarEiningar: ['🏛️', '🗑️', '🪑', '🚧', '🏗️']
     },
-    calculation: ['📊', '🧮', '📏', '💯', '📐'],
-    prices: ['💰', '💲', '🏷️', '💸'],
-    general: ['👋', '👍', '✅', '💭', '❓', '📝'],
-    eco: ['🌱', '♻️', '🌍', '🌿']
+    calculation: ['📊', '🧮', '📏', '💯', '📐', '💰', '💲'],
+    prices: ['💰', '💲', '🏷️', '💸', '📊'],
+    general: ['👋', '👍', '✅', '💭', '❓', '📝', '🤝'],
+    eco: ['🌱', '♻️', '🌍', '🌿', '🌳', '🌲'],
+    building: ['🏗️', '🏢', '🏠', '🏡', '🧱', '🔨', '🔧', '🛠️', '🧰', '📏', '📐'],
+    garden: ['🌿', '🌱', '🌳', '🌲', '🌷', '🏞️'],
+    service: ['👷', '🤝', '📞', '📝', '✅', '✨'],
   };
   
   return suggestions[messageType] || suggestions.general;
@@ -129,14 +125,6 @@ export function getEmojiSuggestions(messageType) {
 export function constructFullSystemPrompt(relevantKnowledge, calculationResult) {
   let prompt = getBasicSystemPrompt();
   prompt += getStructuredResponseInstructions();
-  
-  // Add special instructions for handling Icelandic characters correctly
-  prompt += `\n\nSérstök athugasemd um íslenskar stafsetningar:
-- Sýndu sérstaka aðgát við íslenska sérstafi eins og ð/Ð og þ/Þ
-- Gættu þess að nota aldrei erlenda stafi eins og đ, ŧ, eða ţ í stað íslenskra stafa
-- Athugaðu vandlega orðabil, einkum milli orða eins og "veröndin þín" (ekki "verandinþín" eða "verandaþitt")
-- Passaðu íslenska málfræði, setningaskipan og málnotkun
-- Notaðu orðið "viðbótarefni" eða "aukahellur" í stað "viargangi"`;
   
   if (relevantKnowledge && relevantKnowledge.length > 0) {
     prompt += createKnowledgePrompt(relevantKnowledge);
@@ -183,7 +171,7 @@ export function getResponseTemplate(queryType) {
         "Stutt kynning á fyrirtækinu",
         "Spurning um hvernig hægt sé að aðstoða"
       ],
-      emojis: ['👋', '🏗️', '😊', '🏠']
+      emojis: ['🏡', '👋', '🔨', '🧱']
     },
     farewell: {
       structure: [
@@ -191,7 +179,7 @@ export function getResponseTemplate(queryType) {
         "Hvetja til að hafa samband aftur",
         "Lokaóskir með emoji"
       ],
-      emojis: ['👋', '👍', '🙏', '😊']
+      emojis: ['🏡', '👋', '🤝', '✨']
     },
     eco: {
       structure: [
