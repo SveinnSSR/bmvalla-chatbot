@@ -25,34 +25,18 @@ Persónuleiki þinn:
 }
 
 /**
- * Returns simplified response instructions to optimize answer formatting
+ * Returns structured response instructions to optimize answer formatting
  * @returns {string} - Structured response instructions
  */
 export function getStructuredResponseInstructions() {
   return `
-Mikilvægt: Svörin þín verða að vera hnitmiðuð, skýr og á réttri íslensku.
+Mikilvægt um íslenska stafsetningu:
+- Notaðu alltaf rétta íslenska stafi eins og "ð" (eth) og "þ" (thorn)
+- ALDREI nota erlenda stafi eins og "đ" eða "ţ" í stað íslenskra stafa
+- Hafðu orðabil á réttum stöðum, til dæmis "veröndin þín" en ekki "verandaþín"
+- Notaðu orðið "viðbótarefni" en ekki "viargang" 
 
-1. Byrjaðu með beint svar við spurningunni í 1-2 setningum.
-
-2. Notaðu einfalda uppsetningu:
-   - **Feitletraðan texta** fyrir fyrirsagnir (ekki nota # merki)
-   - Stuttar málsgreinar
-   - *Punktalista (stjörnumerkt)* fyrir valkosti
-   - Númeraða lista (1. 2. 3.) BARA fyrir skref í ákveðinni röð
-
-3. Notaðu viðeigandi emoji til að gera svarið lifandi:
-   - Byggingartengd: 🏗️ 🏢 🏠 🏡 🧱 🔨 🔧 🛠️ 🧰 📏 📐
-   - Garð- og landslagstengd: 🌿 🌱 🌳 🌲 🌷 🏞️
-   - Þjónustutengd: 👷 🤝 📞 📝 ✅ ✨
-   - Útreikningstengd: 🧮 📊 💰 💲
-
-4. AÐGÁT MEÐ ÍSLENSKAN TEXTA:
-   - Notaðu réttan íslenskan staf "ð" (eth), ALDREI "đ"
-   - Notaðu réttan íslenskan staf "þ" (thorn), ALDREI "ţ"
-   - Passaðu orðabilin, t.d. "veröndin þín" (EKKI "verandaþitt")
-   - Forðastu að segja "viargangi" - notaðu "viðbótarefni" eða "aukahellur"
-
-Haltu svörum þínum undir 200-250 orðum nema beðið sé um ítarlegri upplýsingar. Viðskiptavinurinn getur alltaf spurt frekar ef hann vill vita meira.`;
+Haltu svörum þínum undir 300 orðum nema beðið sé um ítarlegri upplýsingar. Viðskiptavinurinn getur alltaf spurt frekar ef hann vill vita meira.`;
 }
 
 /**
@@ -98,19 +82,16 @@ export function createCalculationPrompt(calculationResult) {
 export function getEmojiSuggestions(messageType) {
   const suggestions = {
     product: {
-      hellur: ['🧱', '🛣️', '🏡', '🏗️', '🌿'],
-      steypa: ['🏢', '🏗️', '🧪', '🌱', '🧱'],
-      sandur: ['⏳', '🏖️', '🧱', '🌿'],
-      huseiningar: ['🏠', '🏗️', '🏢', '🧰', '🛠️'],
-      steyptarEiningar: ['🏛️', '🗑️', '🪑', '🚧', '🏗️']
+      hellur: ['🧱', '🛣️', '🏡', '🏗️'],
+      steypa: ['🏢', '🏗️', '🧪', '🌱'],
+      sandur: ['⏳', '🏖️', '🧱'],
+      huseiningar: ['🏠', '🏗️', '🏢', '🧰'],
+      steyptarEiningar: ['🏛️', '🗑️', '🪑', '🚧']
     },
-    calculation: ['📊', '🧮', '📏', '💯', '📐', '💰', '💲'],
-    prices: ['💰', '💲', '🏷️', '💸', '📊'],
-    general: ['👋', '👍', '✅', '💭', '❓', '📝', '🤝'],
-    eco: ['🌱', '♻️', '🌍', '🌿', '🌳', '🌲'],
-    building: ['🏗️', '🏢', '🏠', '🏡', '🧱', '🔨', '🔧', '🛠️', '🧰', '📏', '📐'],
-    garden: ['🌿', '🌱', '🌳', '🌲', '🌷', '🏞️'],
-    service: ['👷', '🤝', '📞', '📝', '✅', '✨'],
+    calculation: ['📊', '🧮', '📏', '💯', '📐'],
+    prices: ['💰', '💲', '🏷️', '💸'],
+    general: ['👋', '👍', '✅', '💭', '❓', '📝'],
+    eco: ['🌱', '♻️', '🌍', '🌿']
   };
   
   return suggestions[messageType] || suggestions.general;

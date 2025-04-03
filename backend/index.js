@@ -666,7 +666,7 @@ async function updateConversationSummary(sessionContext) {
 }
 
 /**
- * Enhanced generateAIResponse function with comprehensive character correction
+ * Generates a response using OpenAI with minimal post-processing for character correction
  * @param {string} message - User message
  * @param {Object} context - Session context
  * @param {Array} relevantKnowledge - Relevant knowledge from knowledge base
@@ -679,36 +679,18 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
   const systemMessage = constructFullSystemPrompt(relevantKnowledge, calculationResult);
   console.log(`🤖 Base system prompt generated (${systemMessage.length} characters)`);
   
-  // Simple length control based on conversation stage
-  let lengthControl = '';
-  if (context.messages.length <= 2) {
-    lengthControl = 'Gefðu stutt og hnitmiðað svar, um 200-250 orð. ';
-  } else if (context.messages.length > 6) {
-    lengthControl = 'Þetta er framhald samtals, hafðu svarið þitt um 150-200 orð. ';
-  } else {
-    lengthControl = 'Haltu svari þínu um 200 orð. ';
-  }
-  
-  // Extremely simple formatting instructions
-  const formattingInstructions = `
-MIKILVÆGT: 
-- Notaðu einfaldan texta án flókinna uppsetningaratriða
-- Notaðu * fyrir staka lista
-- EKKI nota 1. 2. 3. fyrir listaatriði nema það sé í raunverulegri röð
-- Forðastu að hafa mörg bil á milli textablokka
-- Notaðu EINGÖNGU eftirfarandi emoji: 🏡 🏠 🧱 🔨 🛠️ 🌿`;
-
-  // Combined instructions
-  const finalInstructions = `${contextualInstruction || ''} ${lengthControl} ${formattingInstructions}`;
+  // Simple character correction reminder
+  const characterReminder = `
+MIKILVÆGT: Gættu þess að nota rétta íslenska stafi eins og "ð" og "þ" í stað "đ" eða "ţ".`;
   
   // Construct messages array for the API call
   const messages = [
     { role: 'system', content: systemMessage },
-    { role: 'system', content: finalInstructions },
+    { role: 'system', content: characterReminder },
     ...context.messages
   ];
   
-  // If we have a conversation summary, include it
+  // If we have a conversation summary, include it for additional context
   if (context.conversationSummary) {
     console.log(`🧠 Including conversation summary in prompt`);
     messages.splice(2, 0, { 
@@ -717,6 +699,15 @@ MIKILVÆGT:
     });
   }
   
+  // Add contextual instruction if any
+  if (contextualInstruction) {
+    messages.splice(2, 0, {
+      role: 'system',
+      content: `Viðbótarfyrirmæli: ${contextualInstruction}`
+    });
+  }
+  
+  // Add debug logging
   console.log('🤖 Sending to OpenAI with context length:', context.messages.length);
   console.log(`🤖 Total message count: ${messages.length}`);
   
@@ -726,17 +717,15 @@ MIKILVÆGT:
       model: "gpt-4-turbo-preview",
       messages: messages,
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 1000, // Higher limit to ensure complete responses
       presence_penalty: 0.3,
       frequency_penalty: 0.3
     });
     
-    // Apply comprehensive post-processing to fix character issues
-    let processedResponse = postProcessIcelandicText(completion.choices[0].message.content);
+    // Minimal post-processing to fix only character issues
+    let processedResponse = fixIcelandicCharacters(completion.choices[0].message.content);
     
-    console.log(`🤖 Response processed and characters corrected`);
-    
-    // Create new message with processed content
+    // Create new message with fixed content
     const processedMessage = {
       ...completion.choices[0].message,
       content: processedResponse
@@ -750,13 +739,12 @@ MIKILVÆGT:
 }
 
 /**
- * Post-processes Icelandic text to fix character encoding and formatting issues
+ * Fixes Icelandic characters issues only, without changing formatting
  * @param {string} text - Original response text
- * @returns {string} - Corrected text
+ * @returns {string} - Text with corrected Icelandic characters
  */
-function postProcessIcelandicText(text) {
-  // Step 1: Fix character encoding issues
-  let processedText = text
+function fixIcelandicCharacters(text) {
+  return text
     // Fix lowercase Icelandic characters
     .replace(/đ/g, 'ð')
     .replace(/ɖ/g, 'ð')
@@ -768,39 +756,6 @@ function postProcessIcelandicText(text) {
     .replace(/Ţ/g, 'Þ')
     .replace(/Ŧ/g, 'Þ')
     
-    // Fix some common word boundary issues
-    .replace(/veranda(þitt|þín)/g, 'veröndin þín')
-    .replace(/heimilið þitt/g, 'heimilið þitt')
-    .replace(/garðinn þinn/g, 'garðinn þinn')
-    
     // Fix additional special character errors
-    .replace(/\bviargang/g, 'viðbótarefni')
-    .replace(/\bovejar/g, 'óska')
-    .replace(/\bvaƌ/g, 'það')
-    .replace(/\baƌ/g, 'að');
-  
-  // Step 2: Fix formatting issues
-  processedText = processedText
-    // Remove excessive blank lines (more than 2 consecutive newlines)
-    .replace(/\n\s*\n\s*\n+/g, '\n\n')
-    
-    // Fix incorrect list numbering where it's just being used for emphasis
-    .replace(/^(\s*)1\.\s+(.*?)$/gm, function(match, spacing, content) {
-      // Don't replace if it looks like an actual numbered list item
-      if (match.includes('2.') || match.includes('Undirbúningur') || 
-          match.includes('Bygging') || match.includes('Viðhald')) {
-        return match;
-      }
-      return spacing + '* ' + content;
-    })
-    
-    // Ensure proper spacing after asterisks in lists
-    .replace(/\*(\S)/g, '* $1');
-  
-  // Step 3: Check emojis - but we're keeping a wide range now
-  // Just make sure no excessive emojis occur together (more than 3 in a row)
-  const emojiRegex = /[\u{1F300}-\u{1F6FF}\u{2600}-\u{26FF}]{4,}/gu;
-  processedText = processedText.replace(emojiRegex, (match) => match.substring(0, 2));
-  
-  return processedText;
+    .replace(/\bviargang/g, 'viðbótarefni');
 }
