@@ -30,13 +30,24 @@ Persónuleiki þinn:
  */
 export function getStructuredResponseInstructions() {
   return `
-Mikilvægt um íslenska stafsetningu:
-- Notaðu alltaf rétta íslenska stafi eins og "ð" (eth) og "þ" (thorn)
-- ALDREI nota erlenda stafi eins og "đ" eða "ţ" í stað íslenskra stafa
-- Hafðu orðabil á réttum stöðum, til dæmis "veröndin þín" en ekki "verandaþín"
-- Notaðu orðið "viðbótarefni" en ekki "viargang" 
+Mikilvægt: Svörin þín verða að vera vel skipulögð og hnitmiðuð. Formatta svör þín á eftirfarandi hátt:
 
-Haltu svörum þínum undir 300 orðum nema beðið sé um ítarlegri upplýsingar. Viðskiptavinurinn getur alltaf spurt frekar ef hann vill vita meira.`;
+1. **Byrjaðu með hnitmiðað svar** (1-3 setningar) - Svaraðu kjarna spurningarinnar strax í upphafi.
+
+2. **Skipulagðu ítarlegri upplýsingar:**
+   - Notaðu **feitletraðar fyrirsagnir** í stað # merkinga
+   - Notaðu tölulista fyrir skref eða forgangsraðaðar upplýsingar
+   - Notaðu punktalista fyrir eiginleika eða valkosti
+   
+3. **Útreikninga:**
+   - Ef þú ert að reikna, sýndu aðferðina á skiljanlegan hátt
+   - Túlkaðu niðurstöðurnar í einni einfaldri setningu
+   - Gefðu ráðleggingar byggðar á niðurstöðunum
+
+4. **Í lokin:**
+   - Bjóddu upp á eina tengda spurningu sem notandinn gæti viljað spyrja næst
+
+Mikilvægt: Haltu svörum þínum hnitmiðuðum - alltaf undir 800 orðum, nema þegar þú ert sérstaklega beðin(n) um ítarlegri upplýsingar. Forðastu endurtekningar, heldur bentu á mikilvægustu atriðin á skýran hátt.`;
 }
 
 /**
@@ -140,7 +151,7 @@ export function getResponseTemplate(queryType) {
       structure: [
         "Stutt staðfesting á útreikningunum",
         "Útskýring á niðurstöðum með emoji",
-        "Myndræn framsetning á tölum",
+        "Myndræn framsetning á tölum (t.d. með textamyndum eða töflum)",
         "Praktískar ábendingar byggðar á niðurstöðunum",
         "Tillögur um næstu skref"
       ],
@@ -152,7 +163,7 @@ export function getResponseTemplate(queryType) {
         "Stutt kynning á fyrirtækinu",
         "Spurning um hvernig hægt sé að aðstoða"
       ],
-      emojis: ['🏡', '👋', '🔨', '🧱']
+      emojis: ['👋', '🏗️', '😊', '🏠']
     },
     farewell: {
       structure: [
@@ -160,7 +171,7 @@ export function getResponseTemplate(queryType) {
         "Hvetja til að hafa samband aftur",
         "Lokaóskir með emoji"
       ],
-      emojis: ['🏡', '👋', '🤝', '✨']
+      emojis: ['👋', '👍', '🙏', '😊']
     },
     eco: {
       structure: [

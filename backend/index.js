@@ -575,7 +575,7 @@ function generateContextualInstruction(sessionContext) {
   
   // Add project-specific instructions
   if (sessionContext.userIntent.mainGoal === 'building_patio') {
-    instruction += 'Þessi notandi er að skipuleggja verandarverkefni. Hafðu það í huga. ';
+    instruction += 'Þessi notandi er að skipuleggja verandarverkefni. Hafðu það í huga við svörun. ';
     console.log(`🧠 Adding patio project instruction`);
   } else if (sessionContext.userIntent.mainGoal === 'concrete_project') {
     instruction += 'Þessi notandi er að vinna með steypu. Beindu ráðleggingum að því. ';
@@ -592,10 +592,10 @@ function generateContextualInstruction(sessionContext) {
   // Add verbosity control based on previous interactions
   const messageCount = sessionContext.messages.length;
   if (messageCount <= 2) {
-    instruction += 'Þetta er byrjun samtals. Vertu skýr og gagnlegur. ';
-    console.log(`🧠 Adding first-response clarity instruction`);
+    instruction += 'Þetta er byrjun samtals. Vertu ítarleg(ur) en hnitmiðuð í fyrsta svari. ';
+    console.log(`🧠 Adding first-response verbosity instruction`);
   } else if (messageCount > 6) {
-    instruction += 'Þetta er framhald lengra samtals. Vertu hnitmiðaður og forðastu endurtekningar. ';
+    instruction += 'Þetta er framhald lengra samtals. Vertu hnitmiðaðri en áður og forðastu endurtekningar. ';
     console.log(`🧠 Adding follow-up brevity instruction`);
   }
   
@@ -606,7 +606,7 @@ function generateContextualInstruction(sessionContext) {
   }
   
   if (instruction) {
-    console.log(`🧠 Final contextual instruction created: ${instruction}`);
+    console.log(`🧠 Final contextual instruction created (${instruction.length} characters)`);
   } else {
     console.log(`🧠 No contextual instructions generated`);
   }
@@ -666,7 +666,7 @@ async function updateConversationSummary(sessionContext) {
 }
 
 /**
- * Generates a response using OpenAI with minimal post-processing for character correction
+ * Generates a response using OpenAI with enhanced context awareness
  * @param {string} message - User message
  * @param {Object} context - Session context
  * @param {Array} relevantKnowledge - Relevant knowledge from knowledge base
@@ -679,83 +679,44 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
   const systemMessage = constructFullSystemPrompt(relevantKnowledge, calculationResult);
   console.log(`🤖 Base system prompt generated (${systemMessage.length} characters)`);
   
-  // Simple character correction reminder
-  const characterReminder = `
-MIKILVÆGT: Gættu þess að nota rétta íslenska stafi eins og "ð" og "þ" í stað "đ" eða "ţ".`;
+  // Add contextual instruction if any
+  const systemWithContext = contextualInstruction 
+    ? `${systemMessage}\n\nSérstök fyrirmæli fyrir þetta svar: ${contextualInstruction}` 
+    : systemMessage;
   
   // Construct messages array for the API call
   const messages = [
-    { role: 'system', content: systemMessage },
-    { role: 'system', content: characterReminder },
+    { role: 'system', content: systemWithContext },
     ...context.messages
   ];
   
   // If we have a conversation summary, include it for additional context
   if (context.conversationSummary) {
     console.log(`🧠 Including conversation summary in prompt`);
-    messages.splice(2, 0, { 
+    messages.splice(1, 0, { 
       role: 'system', 
       content: `Samtalssamantekt: ${context.conversationSummary}` 
-    });
-  }
-  
-  // Add contextual instruction if any
-  if (contextualInstruction) {
-    messages.splice(2, 0, {
-      role: 'system',
-      content: `Viðbótarfyrirmæli: ${contextualInstruction}`
     });
   }
   
   // Add debug logging
   console.log('🤖 Sending to OpenAI with context length:', context.messages.length);
   console.log(`🤖 Total message count: ${messages.length}`);
+  console.log(`🕒 Making OpenAI API call at ${new Date().toISOString()}`);
   
   // Call OpenAI API
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+      model: "gpt-4-turbo-preview", // Latest available GPT-4 model
       messages: messages,
       temperature: 0.7,
-      max_tokens: 1000, // Higher limit to ensure complete responses
-      presence_penalty: 0.3,
-      frequency_penalty: 0.3
+      max_tokens: 1000 // Higher to avoid getting cut off. Still need to work on concise responses
     });
     
-    // Minimal post-processing to fix only character issues
-    let processedResponse = fixIcelandicCharacters(completion.choices[0].message.content);
-    
-    // Create new message with fixed content
-    const processedMessage = {
-      ...completion.choices[0].message,
-      content: processedResponse
-    };
-    
-    return processedMessage;
+    console.log(`🤖 Received response from OpenAI, token count: ${completion.usage?.total_tokens || 'unknown'}`);
+    return completion.choices[0].message;
   } catch (error) {
     console.error('🚨 Error generating AI response:', error);
     throw error;
   }
-}
-
-/**
- * Fixes Icelandic characters issues only, without changing formatting
- * @param {string} text - Original response text
- * @returns {string} - Text with corrected Icelandic characters
- */
-function fixIcelandicCharacters(text) {
-  return text
-    // Fix lowercase Icelandic characters
-    .replace(/đ/g, 'ð')
-    .replace(/ɖ/g, 'ð')
-    .replace(/ţ/g, 'þ')
-    .replace(/ŧ/g, 'þ')
-    
-    // Fix uppercase Icelandic characters
-    .replace(/Đ/g, 'Ð')
-    .replace(/Ţ/g, 'Þ')
-    .replace(/Ŧ/g, 'Þ')
-    
-    // Fix additional special character errors
-    .replace(/\bviargang/g, 'viðbótarefni');
 }
