@@ -35,7 +35,7 @@ Mikilvægt: Svörin þín verða að vera vel skipulögð og hnitmiðuð. Format
 1. **Byrjaðu með hnitmiðað svar** (1-3 setningar) - Svaraðu kjarna spurningarinnar strax í upphafi.
 
 2. **Skipulagðu ítarlegri upplýsingar:**
-   - Notaðu **feitletraðar fyrirsagnir** í stað # merkinga
+   - Notaðu **feitletraðan texta** fyrir fyrirsagnir, ALDREI nota # merki fyrir fyrirsagnir
    - Notaðu tölulista fyrir skref eða forgangsraðaðar upplýsingar
    - Notaðu punktalista fyrir eiginleika eða valkosti
    
@@ -47,7 +47,7 @@ Mikilvægt: Svörin þín verða að vera vel skipulögð og hnitmiðuð. Format
 4. **Í lokin:**
    - Bjóddu upp á eina tengda spurningu sem notandinn gæti viljað spyrja næst
 
-Mikilvægt: Haltu svörum þínum hnitmiðuðum - alltaf undir 800 orðum, nema þegar þú ert sérstaklega beðin(n) um ítarlegri upplýsingar. Forðastu endurtekningar, heldur bentu á mikilvægustu atriðin á skýran hátt.`;
+Mikilvægt: Haltu svörum þínum hnitmiðuðum - alltaf undir 400-500 orðum, nema þegar þú ert sérstaklega beðin(n) um ítarlegri upplýsingar. Forðastu endurtekningar, heldur bentu á mikilvægustu atriðin á skýran hátt.`;
 }
 
 /**

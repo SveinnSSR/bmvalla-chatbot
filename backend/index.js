@@ -679,10 +679,17 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
   const systemMessage = constructFullSystemPrompt(relevantKnowledge, calculationResult);
   console.log(`🤖 Base system prompt generated (${systemMessage.length} characters)`);
   
+  // Add a simple formatting reminder without changing anything else
+  const formattingReminder = `
+MIKILVÆGT: 
+- Notaðu **feitletraðan texta** fyrir fyrirsagnir í stað # merkinga
+- Forðastu að nota stök # merki í svörum þínum
+- Haltu svörum þínum undir 400-500 orðum nema beðið sé um ítarlegri upplýsingar`;
+
   // Add contextual instruction if any
   const systemWithContext = contextualInstruction 
-    ? `${systemMessage}\n\nSérstök fyrirmæli fyrir þetta svar: ${contextualInstruction}` 
-    : systemMessage;
+    ? `${systemMessage}\n\n${formattingReminder}\n\nSérstök fyrirmæli fyrir þetta svar: ${contextualInstruction}` 
+    : `${systemMessage}\n\n${formattingReminder}`;
   
   // Construct messages array for the API call
   const messages = [
@@ -710,11 +717,23 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
       model: "gpt-4-turbo-preview", // Latest available GPT-4 model
       messages: messages,
       temperature: 0.7,
-      max_tokens: 1000 // Higher to avoid getting cut off. Still need to work on concise responses
+      max_tokens: 1200 // Increased to avoid cut-offs
     });
     
+    // Apply minimal post-processing to remove standalone # characters
+    let processedContent = completion.choices[0].message.content;
+    
+    // Remove standalone # characters (not affecting markdown headings with text)
+    processedContent = processedContent.replace(/(\n|^)#(\n|$)/g, '\n\n');
+    
+    // Create new message with processed content
+    const processedMessage = {
+      ...completion.choices[0].message,
+      content: processedContent
+    };
+    
     console.log(`🤖 Received response from OpenAI, token count: ${completion.usage?.total_tokens || 'unknown'}`);
-    return completion.choices[0].message;
+    return processedMessage;
   } catch (error) {
     console.error('🚨 Error generating AI response:', error);
     throw error;
