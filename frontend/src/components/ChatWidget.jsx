@@ -9,7 +9,7 @@ const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 const ChatWidget = ({ 
   webhookUrl = 'https://bmv-ai-service.vercel.app/chat', 
-  apiKey, 
+  apiKey = 'bmv-2025-7f8a91d3e5c6b2', 
   language = 'is', 
   isEmbedded = false 
 }) => {
