@@ -6,7 +6,7 @@ import ChatWidget from "../ChatWidget";
 
 const Layout = ({ children }) => {
   // API key should be stored in environment variables
-  const apiKey = import.meta.env.VITE_API_KEY || "API_KEY=bmv-2025-7f8a91d3e5c6b2";
+  const apiKey = import.meta.env.VITE_API_KEY || "bmv-2025-7f8a91d3e5c6b2";
 
   return (
     <div className="layout">

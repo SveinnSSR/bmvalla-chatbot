@@ -168,7 +168,7 @@ const ChatWidget = ({
       
       // Send to backend
       const feedbackUrl = webhookUrl.replace('/chat', '') + '/feedback';
-      
+
       const response = await fetch(feedbackUrl, {
         method: 'POST',
         headers: {
@@ -215,6 +215,7 @@ const ChatWidget = ({
     checkSessionTimeout();
     
     try {
+      console.log("Sending request with API key:", apiKey);  
       const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
@@ -226,7 +227,9 @@ const ChatWidget = ({
           sessionId: sessionId
         })
       });   
-    
+      // Log the response status
+      console.log("Response status:", response.status);
+
       const data = await response.json();
       setIsTyping(false);
       
