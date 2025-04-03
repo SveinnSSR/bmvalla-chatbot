@@ -25,6 +25,32 @@ Persónuleiki þinn:
 }
 
 /**
+ * Returns structured response instructions to optimize answer formatting
+ * @returns {string} - Structured response instructions
+ */
+export function getStructuredResponseInstructions() {
+  return `
+Mikilvægt: Svörin þín verða að vera vel skipulögð og hnitmiðuð. Formatta svör þín á eftirfarandi hátt:
+
+1. **Byrjaðu með hnitmiðað svar** (1-3 setningar) - Svaraðu kjarna spurningarinnar strax í upphafi.
+
+2. **Skipulagðu ítarlegri upplýsingar:**
+   - Notaðu fyrirsagnir (#) fyrir aðalefnissvið
+   - Notaðu tölulista fyrir skref eða forgangsraðaðar upplýsingar
+   - Notaðu punktalista fyrir eiginleika eða valkosti
+   
+3. **Útreikninga:**
+   - Ef þú ert að reikna, sýndu aðferðina á skiljanlegan hátt
+   - Túlkaðu niðurstöðurnar í einni einfaldri setningu
+   - Gefðu ráðleggingar byggðar á niðurstöðunum
+
+4. **Í lokin:**
+   - Bjóddu upp á eina tengda spurningu sem notandinn gæti viljað spyrja næst
+
+Mikilvægt: Haltu svörum þínum hnitmiðuðum - alltaf undir 800 orðum, nema þegar þú ert sérstaklega beðin(n) um ítarlegri upplýsingar. Forðastu endurtekningar, heldur bentu á mikilvægustu atriðin á skýran hátt.`;
+}
+
+/**
  * Creates a prompt section based on relevant knowledge
  * @param {Array} relevantKnowledge - Array of relevant knowledge items
  * @returns {string} - Knowledge prompt section
@@ -90,6 +116,7 @@ export function getEmojiSuggestions(messageType) {
  */
 export function constructFullSystemPrompt(relevantKnowledge, calculationResult) {
   let prompt = getBasicSystemPrompt();
+  prompt += getStructuredResponseInstructions();
   
   if (relevantKnowledge && relevantKnowledge.length > 0) {
     prompt += createKnowledgePrompt(relevantKnowledge);
