@@ -317,6 +317,29 @@ app.get('/diagnostic', verifyApiKey, async (req, res) => {
   }
 });
 
+// Add these near your other endpoints
+app.get('/public-test', (req, res) => {
+  console.log('Public test endpoint hit');
+  res.status(200).json({ 
+    message: "Public test endpoint is running", 
+    time: new Date().toISOString(),
+    env: {
+      apiKeyExists: !!process.env.API_KEY,
+      openAIKeyExists: !!process.env.OPENAI_API_KEY
+    }
+  });
+});
+
+app.get('/api-test', (req, res) => {
+  const apiKey = req.header('x-api-key');
+  res.status(200).json({
+    message: "API test endpoint",
+    apiKeyProvided: !!apiKey,
+    apiKeyMatches: apiKey === process.env.API_KEY,
+    time: new Date().toISOString()
+  });
+});
+
 // Start server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
