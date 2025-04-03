@@ -710,7 +710,7 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
       model: "gpt-4-turbo-preview", // Latest available GPT-4 model
       messages: messages,
       temperature: 0.7,
-      max_tokens: 600 // Reduced to encourage more concise responses
+      max_tokens: 1000 // Higher to avoid getting cut off. Still need to work on concise responses
     });
     
     console.log(`🤖 Received response from OpenAI, token count: ${completion.usage?.total_tokens || 'unknown'}`);

@@ -35,7 +35,7 @@ Mikilvægt: Svörin þín verða að vera vel skipulögð og hnitmiðuð. Format
 1. **Byrjaðu með hnitmiðað svar** (1-3 setningar) - Svaraðu kjarna spurningarinnar strax í upphafi.
 
 2. **Skipulagðu ítarlegri upplýsingar:**
-   - Notaðu fyrirsagnir (#) fyrir aðalefnissvið
+   - Notaðu **feitletraðar fyrirsagnir** í stað # merkinga
    - Notaðu tölulista fyrir skref eða forgangsraðaðar upplýsingar
    - Notaðu punktalista fyrir eiginleika eða valkosti
    
