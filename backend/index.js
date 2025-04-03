@@ -575,7 +575,7 @@ function generateContextualInstruction(sessionContext) {
   
   // Add project-specific instructions
   if (sessionContext.userIntent.mainGoal === 'building_patio') {
-    instruction += 'Þessi notandi er að skipuleggja verandarverkefni. Hafðu það í huga við svörun. ';
+    instruction += 'Þessi notandi er að skipuleggja verandarverkefni. Gefðu hagnýtar upplýsingar sem tengjast þessu verkefni. ';
     console.log(`🧠 Adding patio project instruction`);
   } else if (sessionContext.userIntent.mainGoal === 'concrete_project') {
     instruction += 'Þessi notandi er að vinna með steypu. Beindu ráðleggingum að því. ';
@@ -585,18 +585,18 @@ function generateContextualInstruction(sessionContext) {
   // Add instructions based on project details
   if (sessionContext.userIntent.projectDetails.dimensions) {
     const { length, width } = sessionContext.userIntent.projectDetails.dimensions;
-    instruction += `Notandinn hefur nefnt svæði sem er ${length}x${width} metrar. Taktu tillit til þess. `;
+    instruction += `Notandinn hefur nefnt svæði sem er ${length}x${width} metrar. Notaðu þessar upplýsingar í svari þínu. `;
     console.log(`🧠 Adding dimension-specific instruction: ${length}x${width}m`);
   }
   
-  // Add verbosity control based on previous interactions
+  // Add progressive disclosure instructions
   const messageCount = sessionContext.messages.length;
   if (messageCount <= 2) {
-    instruction += 'Þetta er byrjun samtals. Vertu ítarleg(ur) en hnitmiðuð í fyrsta svari. ';
-    console.log(`🧠 Adding first-response verbosity instruction`);
+    instruction += 'Svaraðu fyrst aðalspurningunni á skýran hátt og bjóddu síðan upp á að veita frekari upplýsingar. ';
+    console.log(`🧠 Adding progressive disclosure instruction`);
   } else if (messageCount > 6) {
-    instruction += 'Þetta er framhald lengra samtals. Vertu hnitmiðaðri en áður og forðastu endurtekningar. ';
-    console.log(`🧠 Adding follow-up brevity instruction`);
+    instruction += 'Þetta er framhald lengra samtals. Vertu mjög hnitmiðaður í svari þínu og forðastu endurtekningar. ';
+    console.log(`🧠 Adding brevity instruction for longer conversation`);
   }
   
   // If user has environmental interests
@@ -679,10 +679,20 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
   const systemMessage = constructFullSystemPrompt(relevantKnowledge, calculationResult);
   console.log(`🤖 Base system prompt generated (${systemMessage.length} characters)`);
   
-  // Add contextual instruction if any
+  // Add verbosity control based on conversation stage
+  let verbosityInstruction = '';
+  if (context.messages.length <= 2) {
+    verbosityInstruction = 'Notandinn er að byrja samtalið. Gefðu hnitmiðað en upplýsandi svar upp á 200-300 orð. ';
+  } else if (context.messages.length > 6) {
+    verbosityInstruction = 'Notandinn er í lengra samtali. Vertu mjög hnitmiðaður, ekki endurtaka upplýsingar sem þú hefur þegar gefið. Takmarkaðu svarið við 100-200 orð. ';
+  } else {
+    verbosityInstruction = 'Haltu svari þínu hnitmiðuðu og innan við 250 orða. ';
+  }
+  
+  // Add contextual instruction if any, plus verbosity control
   const systemWithContext = contextualInstruction 
-    ? `${systemMessage}\n\nSérstök fyrirmæli fyrir þetta svar: ${contextualInstruction}` 
-    : systemMessage;
+    ? `${systemMessage}\n\nSérstök fyrirmæli fyrir þetta svar: ${contextualInstruction} ${verbosityInstruction}` 
+    : `${systemMessage}\n\nSérstök fyrirmæli fyrir þetta svar: ${verbosityInstruction}`;
   
   // Construct messages array for the API call
   const messages = [
@@ -710,7 +720,9 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
       model: "gpt-4-turbo-preview", // Latest available GPT-4 model
       messages: messages,
       temperature: 0.7,
-      max_tokens: 1000 // Higher to avoid getting cut off. Still need to work on concise responses
+      max_tokens: 1200, // Higher to avoid getting cut off but with improved brevity instructions
+      presence_penalty: 0.6, // Add slight penalty for repetition
+      frequency_penalty: 0.5 // Encourage more diverse language
     });
     
     console.log(`🤖 Received response from OpenAI, token count: ${completion.usage?.total_tokens || 'unknown'}`);
