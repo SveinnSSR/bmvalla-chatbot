@@ -12,6 +12,12 @@ const { Pool } = pg;
 // Load environment variables
 dotenv.config();
 
+// Enhanced startup logging
+console.log('🚀 SERVER STARTING - ' + new Date().toISOString());
+console.log('Environment check - NODE_ENV:', process.env.NODE_ENV);
+console.log('API_KEY configured:', !!process.env.API_KEY);
+console.log('OPENAI_API_KEY configured:', !!process.env.OPENAI_API_KEY);
+
 // Determine database connection string based on environment
 let dbConnectionString;
 if (process.env.POSTGRES_URL) {
@@ -69,20 +75,87 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'x-api-key']
 }));
 app.use(express.json());
+app.use(express.static('public')); // For serving static files if needed
 
-// API Key verification
+// Add request logging middleware
+app.use((req, res, next) => {
+  console.log(`⚡ REQUEST: ${req.method} ${req.path}`);
+  next();
+});
+
+// Enhanced API Key verification with better logging
 const verifyApiKey = (req, res, next) => {
   const apiKey = req.header('x-api-key');
+  console.log('🔑 API Key Check:', {
+    receivedKey: apiKey ? 'Provided (not showing value)' : 'Not provided',
+    expectedKey: process.env.API_KEY ? 'Configured (not showing value)' : 'Not configured',
+    matches: apiKey === process.env.API_KEY
+  });
+  
   if (!apiKey || apiKey !== process.env.API_KEY) {
-    return res.status(401).json({ error: "Unauthorized" });
+    console.error('❌ Invalid or missing API key');
+    return res.status(401).json({ error: "Unauthorized request" });
   }
   next();
 };
+
+// Root endpoint for basic connectivity check
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="is">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>BM Vallá AI Service</title>
+      <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+        h1 { color: #CB3727; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .status { display: inline-block; padding: 5px 10px; border-radius: 4px; background: #4CAF50; color: white; }
+      </style>
+    </head>
+    <body>
+      <h1>BM Vallá AI Service</h1>
+      <div class="card">
+        <p><span class="status">✓ Online</span> Server time: ${new Date().toISOString()}</p>
+        <p>This is the API server for the BM Vallá AI Assistant.</p>
+        <p>The API is running and ready to handle requests from the chat widget.</p>
+      </div>
+      <div class="card">
+        <h2>API Endpoints</h2>
+        <ul>
+          <li><strong>/chat</strong> - Main chat endpoint (requires API key)</li>
+          <li><strong>/health</strong> - Health check endpoint</li>
+          <li><strong>/test</strong> - Test endpoint</li>
+          <li><strong>/diagnostic</strong> - Detailed diagnostic endpoint (requires API key)</li>
+        </ul>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+// Simple test endpoint for connectivity testing
+app.get('/test', (req, res) => {
+  console.log('Test endpoint hit');
+  res.status(200).json({ 
+    message: "API server is running", 
+    time: new Date().toISOString() 
+  });
+});
 
 // Main chat endpoint
 app.post('/chat', verifyApiKey, async (req, res) => {
   try {
     const { message, sessionId } = req.body;
+    
+    // Log the incoming request details
+    console.log(`📝 Processing request:`, {
+      sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'undefined',
+      messageLength: message ? message.length : 0,
+      timestamp: new Date().toISOString()
+    });
     
     // Get or create session context
     const sessionContext = getSessionContext(sessionId);
@@ -160,9 +233,11 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
   } catch (error) {
     console.error('Error handling chat request:', error);
+    console.error('Stack trace:', error.stack);
+    
     return res.status(500).json({ 
-      error: "Villa kom upp við vinnslu fyrirspurnar. Vinsamlegast reyndu aftur.",
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: "Því miður kom upp villa. Vinsamlegast reyndu aftur síðar.",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -226,6 +301,11 @@ app.get('/diagnostic', verifyApiKey, async (req, res) => {
       },
       cache: {
         size: responseCache.size
+      },
+      environment: {
+        apiKeyConfigured: !!process.env.API_KEY,
+        openaiKeyConfigured: !!process.env.OPENAI_API_KEY,
+        dbConfigured: !!dbConnectionString
       }
     });
   } catch (error) {
@@ -240,7 +320,10 @@ app.get('/diagnostic', verifyApiKey, async (req, res) => {
 // Start server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`API Key configured: ${!!process.env.API_KEY}`);
+  console.log(`OpenAI API Key configured: ${!!process.env.OPENAI_API_KEY}`);
+  console.log(`Database connection string configured: ${!!dbConnectionString}`);
 });
 
 // ================ HELPER FUNCTIONS ================
