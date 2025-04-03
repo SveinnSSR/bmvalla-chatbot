@@ -32,26 +32,32 @@ export function getStructuredResponseInstructions() {
   return `
 Mikilvægt: Svörin þín verða að vera hnitmiðuð og skýr. Formatta svör þín á eftirfarandi hátt:
 
-1. Byrjaðu með beint svar við spurningunni í 1-2 setningum.
+1. Byrjaðu með beint svar við spurningunni (1-2 setningar).
 
 2. Skipulagðu ítarlegri upplýsingar:
-   - Notaðu **feitletraðan texta** fyrir fyrirsagnir, ekki # merkið
+   - Notaðu **feitletraðan texta** fyrir fyrirsagnir
    - Skrifaðu stuttar og skýrar málsgreinar
    - Ekki hafa mikil bil á milli málsgreina
-   - Passaðu íslenska stafsetningu
 
 3. Fyrir lista:
-   - Notaðu * eða - fyrir punkta
-   - Notaðu 1. 2. 3. fyrir númeraða lista
+   - Notaðu * fyrir óraðaða lista
+   - Notaðu 1. 2. 3. fyrir númeraða lista (notað þegar skref eru í ákveðinni röð)
    - Haltu listaatriðum stuttum
 
 4. Fyrir útreikninga:
    - Sýndu skýra útreikninga
    - Útskýrðu niðurstöðuna á einfaldan hátt
-   - Notaðu viðbótarmagn (10%) fyrir byggingaefni, ekki "viargang"
 
 5. Í lokin:
    - Bjóddu upp á eina tengda spurningu
+
+6. MIKILVÆGT - RÉTT NOTKUN ÍSLENSKRA STAFA:
+   - Notaðu alltaf réttan íslenskan staf "ð" (eth), aldrei erlenda stafi eins og "đ"
+   - Notaðu alltaf réttan íslenskan staf "þ" (thorn), aldrei erlenda stafi eins og "ţ"
+   - Gakktu úr skugga um að orð séu aðskilin með bilum
+   - Gakktu úr skugga um að setningar séu á réttu íslensku málfræðilega séð
+
+7. Notaðu 1-2 viðeigandi emoji til að gera textann aðlaðandi (t.d. við fyrirsagnir eða í lokin).
 
 Haltu svörum þínum hnitmiðuðum, 200-250 orð er ágætis lengd. Mundu að notandinn getur alltaf spurt nánar ef hann vill frekari upplýsingar.`;
 }
@@ -123,6 +129,14 @@ export function getEmojiSuggestions(messageType) {
 export function constructFullSystemPrompt(relevantKnowledge, calculationResult) {
   let prompt = getBasicSystemPrompt();
   prompt += getStructuredResponseInstructions();
+  
+  // Add special instructions for handling Icelandic characters correctly
+  prompt += `\n\nSérstök athugasemd um íslenskar stafsetningar:
+- Sýndu sérstaka aðgát við íslenska sérstafi eins og ð/Ð og þ/Þ
+- Gættu þess að nota aldrei erlenda stafi eins og đ, ŧ, eða ţ í stað íslenskra stafa
+- Athugaðu vandlega orðabil, einkum milli orða eins og "veröndin þín" (ekki "verandinþín" eða "verandaþitt")
+- Passaðu íslenska málfræði, setningaskipan og málnotkun
+- Notaðu orðið "viðbótarefni" eða "aukahellur" í stað "viargangi"`;
   
   if (relevantKnowledge && relevantKnowledge.length > 0) {
     prompt += createKnowledgePrompt(relevantKnowledge);

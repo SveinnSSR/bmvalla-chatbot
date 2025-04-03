@@ -666,7 +666,7 @@ async function updateConversationSummary(sessionContext) {
 }
 
 /**
- * Generates a response using OpenAI with enhanced context awareness
+ * Generates a response using OpenAI with enhanced context awareness and Icelandic character handling
  * @param {string} message - User message
  * @param {Object} context - Session context
  * @param {Array} relevantKnowledge - Relevant knowledge from knowledge base
@@ -679,6 +679,14 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
   const systemMessage = constructFullSystemPrompt(relevantKnowledge, calculationResult);
   console.log(`🤖 Base system prompt generated (${systemMessage.length} characters)`);
   
+  // Add character handling instructions
+  const icelandicCharInstructions = `
+MIKILVÆGT UM ÍSLENSKA STAFSETNINGU:
+- Notaðu bara rétta íslenska stafi eins og "ð" (eth) og "þ" (thorn) 
+- ALDREI nota "đ", "ţ" eða önnur erlend tákn í stað íslenskra stafa
+- Tryggðu bil á milli orða (t.d. "veröndin þín", ekki "verandaþitt")
+- Farðu yfir texta þinn til að tryggja rétta íslenska málfræði og stafsetningu`;
+  
   // Add length control based on conversation stage
   let lengthControl = '';
   if (context.messages.length <= 2) {
@@ -689,14 +697,18 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
     lengthControl = 'Haltu svari þínu um 250 orð. ';
   }
   
+  // Add emoji reminder
+  const emojiReminder = 'Bættu við 1-2 viðeigandi emoji til að lífga upp á svarið þitt. ';
+  
   // Combine with contextual instruction if any
   const finalInstructions = contextualInstruction 
-    ? `${contextualInstruction} ${lengthControl}` 
-    : lengthControl;
+    ? `${contextualInstruction} ${lengthControl} ${emojiReminder}` 
+    : `${lengthControl} ${emojiReminder}`;
   
   // Construct messages array for the API call
   const messages = [
     { role: 'system', content: systemMessage },
+    { role: 'system', content: icelandicCharInstructions },
     { role: 'system', content: `Viðbótarfyrirmæli: ${finalInstructions}` },
     ...context.messages
   ];
@@ -704,7 +716,7 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
   // If we have a conversation summary, include it for additional context
   if (context.conversationSummary) {
     console.log(`🧠 Including conversation summary in prompt`);
-    messages.splice(2, 0, { 
+    messages.splice(3, 0, { 
       role: 'system', 
       content: `Samtalssamantekt: ${context.conversationSummary}` 
     });
@@ -721,10 +733,28 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
       model: "gpt-4-turbo-preview", // Latest available GPT-4 model
       messages: messages,
       temperature: 0.7,
-      max_tokens: 1000, // Higher limit to ensure complete responses
+      max_tokens: 1000, // Ensure complete responses
       presence_penalty: 0.3,
       frequency_penalty: 0.3
     });
+    
+    // Check for Icelandic character issues before returning
+    let responseContent = completion.choices[0].message.content;
+    
+    // Additional verification for incorrect characters
+    const suspiciousCharCheck = responseContent.match(/[đţŧ]/g);
+    if (suspiciousCharCheck) {
+      console.log(`⚠️ Found ${suspiciousCharCheck.length} suspicious characters in response`);
+      
+      // Replace incorrect characters
+      responseContent = responseContent
+        .replace(/đ/g, 'ð')
+        .replace(/ţ/g, 'þ')
+        .replace(/ŧ/g, 'þ');
+        
+      // Create new message with fixed content
+      completion.choices[0].message.content = responseContent;
+    }
     
     console.log(`🤖 Received response from OpenAI, token count: ${completion.usage?.total_tokens || 'unknown'}`);
     return completion.choices[0].message;
