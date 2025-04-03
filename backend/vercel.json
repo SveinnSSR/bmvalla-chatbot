@@ -1,4 +1,3 @@
-// Create a new file called vercel.json in your backend directory
 {
   "version": 2,
   "builds": [
