@@ -421,7 +421,7 @@ const ChatWidget = ({
       {/* Chat area */}
       {!isMinimized && (
         <div style={{
-          height: '500px', // Increased from 400px
+          height: '400px',
           backgroundColor: 'white',
           overflowY: 'auto',
           padding: '16px'
