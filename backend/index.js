@@ -567,43 +567,46 @@ function detectProjectIntent(userMessage, sessionContext) {
 function generateContextualInstruction(sessionContext) {
   let instruction = '';
   
-  // Add simple topic-specific instructions
-  if (sessionContext.topics.includes('hellur')) {
-    instruction += 'Þú ert að svara spurningu um hellur. ';
-    console.log(`🧠 Adding hellur context`);
+  // Add topic-specific instructions
+  if (sessionContext.topics.includes('hellur') && sessionContext.topics.includes('verð')) {
+    instruction += 'Þegar þú svarar um verð á hellum, vertu nákvæm(ur) um hvort verðið er per fermetra eða per stykki. ';
+    console.log(`🧠 Adding price clarity instruction for paving stones`);
   }
   
-  if (sessionContext.topics.includes('steypa')) {
-    instruction += 'Þú ert að svara spurningu um steypu. ';
-    console.log(`🧠 Adding steypa context`);
-  }
-  
-  // Add very simple project-specific instructions
+  // Add project-specific instructions
   if (sessionContext.userIntent.mainGoal === 'building_patio') {
-    instruction += 'Notandinn er að skipuleggja verönd. ';
-    console.log(`🧠 Adding patio project context`);
+    instruction += 'Þessi notandi er að skipuleggja verandarverkefni. Hafðu það í huga. ';
+    console.log(`🧠 Adding patio project instruction`);
   } else if (sessionContext.userIntent.mainGoal === 'concrete_project') {
-    instruction += 'Notandinn er að vinna með steypu. ';
-    console.log(`🧠 Adding concrete project context`);
+    instruction += 'Þessi notandi er að vinna með steypu. Beindu ráðleggingum að því. ';
+    console.log(`🧠 Adding concrete project instruction`);
   }
   
-  // Add simple dimension instructions if available
+  // Add instructions based on project details
   if (sessionContext.userIntent.projectDetails.dimensions) {
     const { length, width } = sessionContext.userIntent.projectDetails.dimensions;
-    instruction += `Svæðið er ${length}x${width} metrar. `;
-    console.log(`🧠 Adding dimensions: ${length}x${width}m`);
+    instruction += `Notandinn hefur nefnt svæði sem er ${length}x${width} metrar. Taktu tillit til þess. `;
+    console.log(`🧠 Adding dimension-specific instruction: ${length}x${width}m`);
   }
   
-  // Very simple brevity control
+  // Add verbosity control based on previous interactions
   const messageCount = sessionContext.messages.length;
   if (messageCount <= 2) {
-    instruction += 'Vertu hnitmiðaður en hjálplegur. ';
+    instruction += 'Þetta er byrjun samtals. Vertu skýr og gagnlegur. ';
+    console.log(`🧠 Adding first-response clarity instruction`);
   } else if (messageCount > 6) {
-    instruction += 'Vertu mjög hnitmiðaður. ';
+    instruction += 'Þetta er framhald lengra samtals. Vertu hnitmiðaður og forðastu endurtekningar. ';
+    console.log(`🧠 Adding follow-up brevity instruction`);
+  }
+  
+  // If user has environmental interests
+  if (sessionContext.topics.includes('umhverfisvænt')) {
+    instruction += 'Notandinn hefur áhuga á umhverfissjónarmiðum. Bentu á umhverfisvottaðar vörur þegar við á. ';
+    console.log(`🧠 Adding environmental focus instruction`);
   }
   
   if (instruction) {
-    console.log(`🧠 Final contextual instruction: ${instruction}`);
+    console.log(`🧠 Final contextual instruction created: ${instruction}`);
   } else {
     console.log(`🧠 No contextual instructions generated`);
   }
@@ -676,42 +679,32 @@ async function generateAIResponse(message, context, relevantKnowledge, calculati
   const systemMessage = constructFullSystemPrompt(relevantKnowledge, calculationResult);
   console.log(`🤖 Base system prompt generated (${systemMessage.length} characters)`);
   
-  // Add a simple instruction to ensure proper character encoding and formatting
-  const simpleFormatInstructions = `
-MIKILVÆGT: 
-- Notaðu bara einfaldan texta og staðlaðar íslenskar stafsetningar
-- Forðastu sérstaka stafi eða óvenjulega uppsetningu
-- Haltu svari undir 250 orðum
-- Notaðu aðeins * fyrir lista og ** fyrir feitletraðan texta
-- EKKI nota # merki eða önnur flókin Markdown tákn
-- Haltu texta þínum skýrum og einföldum`;
-
-  // Add verbosity control based on conversation stage
-  let verbosityInstruction = '';
+  // Add length control based on conversation stage
+  let lengthControl = '';
   if (context.messages.length <= 2) {
-    verbosityInstruction = 'Notandinn er að byrja samtal. Gefðu stuttan en gagnlegan texta, 150-200 orð. ';
+    lengthControl = 'Þetta er fyrsta samtalið, gefðu hnitmiðað en gagnlegt svar um 250 orð að lengd. ';
   } else if (context.messages.length > 6) {
-    verbosityInstruction = 'Notandinn er í lengra samtali. Vertu mjög hnitmiðaður, 100-150 orð. ';
+    lengthControl = 'Þetta er lengra samtal, hafðu svarið þitt um 200 orð. ';
   } else {
-    verbosityInstruction = 'Haltu svari þínu hnitmiðuðu, 150-200 orð. ';
+    lengthControl = 'Haltu svari þínu um 250 orð. ';
   }
   
-  // Combine instructions, keeping them simple
-  const finalSystemPrompt = `${systemMessage}
-${simpleFormatInstructions}
-${verbosityInstruction}
-${contextualInstruction ? 'Viðbótarfyrirmæli: ' + contextualInstruction : ''}`;
+  // Combine with contextual instruction if any
+  const finalInstructions = contextualInstruction 
+    ? `${contextualInstruction} ${lengthControl}` 
+    : lengthControl;
   
   // Construct messages array for the API call
   const messages = [
-    { role: 'system', content: finalSystemPrompt },
+    { role: 'system', content: systemMessage },
+    { role: 'system', content: `Viðbótarfyrirmæli: ${finalInstructions}` },
     ...context.messages
   ];
   
   // If we have a conversation summary, include it for additional context
   if (context.conversationSummary) {
     console.log(`🧠 Including conversation summary in prompt`);
-    messages.splice(1, 0, { 
+    messages.splice(2, 0, { 
       role: 'system', 
       content: `Samtalssamantekt: ${context.conversationSummary}` 
     });
@@ -728,9 +721,9 @@ ${contextualInstruction ? 'Viðbótarfyrirmæli: ' + contextualInstruction : ''}
       model: "gpt-4-turbo-preview", // Latest available GPT-4 model
       messages: messages,
       temperature: 0.7,
-      max_tokens: 1200, // Higher limit but with strict brevity instructions
-      presence_penalty: 0.6,
-      frequency_penalty: 0.5
+      max_tokens: 1000, // Higher limit to ensure complete responses
+      presence_penalty: 0.3,
+      frequency_penalty: 0.3
     });
     
     console.log(`🤖 Received response from OpenAI, token count: ${completion.usage?.total_tokens || 'unknown'}`);

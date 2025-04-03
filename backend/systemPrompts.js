@@ -30,34 +30,30 @@ Persónuleiki þinn:
  */
 export function getStructuredResponseInstructions() {
   return `
-Mikilvægt: Svörin þín verða að vera hnitmiðuð og skýr. 
+Mikilvægt: Svörin þín verða að vera hnitmiðuð og skýr. Formatta svör þín á eftirfarandi hátt:
 
-1. Byrjaðu með beint svar við spurningunni (1-2 setningar).
+1. Byrjaðu með beint svar við spurningunni í 1-2 setningum.
 
-2. Notaðu einfalda uppsetningu:
-   - Bold texti fyrir fyrirsagnir
-   - Stuttar setningar
-   - Einfalt orðalag
-   - Einfaldur texti án flókinna tákna
+2. Skipulagðu ítarlegri upplýsingar:
+   - Notaðu **feitletraðan texta** fyrir fyrirsagnir, ekki # merkið
+   - Skrifaðu stuttar og skýrar málsgreinar
+   - Ekki hafa mikil bil á milli málsgreina
+   - Passaðu íslenska stafsetningu
 
 3. Fyrir lista:
-   - Notaðu einfaldar stjörnumerkingar (*)
+   - Notaðu * eða - fyrir punkta
+   - Notaðu 1. 2. 3. fyrir númeraða lista
    - Haltu listaatriðum stuttum
 
-4. Ef þú þarft að sýna útreikninga:
-   - Haltu þeim einföldum
-   - Útskýrðu niðurstöðuna skýrt
+4. Fyrir útreikninga:
+   - Sýndu skýra útreikninga
+   - Útskýrðu niðurstöðuna á einfaldan hátt
+   - Notaðu viðbótarmagn (10%) fyrir byggingaefni, ekki "viargang"
 
 5. Í lokin:
    - Bjóddu upp á eina tengda spurningu
 
-Mikilvægt:
-- Haltu svari undir 250 orðum
-- Notaðu bara grunnstafi (* og **) fyrir uppsetningu, ekki # eða önnur flókin Markdown-tákn
-- Forðastu stór bil milli textablokka
-- Haltu texta þínum einföldum
-- Notaðu bara einfaldar stjörnumerkingar (*) fyrir listaatriði
-- Mundu að notandinn getur alltaf spurt nánar`;
+Haltu svörum þínum hnitmiðuðum, 200-250 orð er ágætis lengd. Mundu að notandinn getur alltaf spurt nánar ef hann vill frekari upplýsingar.`;
 }
 
 /**
