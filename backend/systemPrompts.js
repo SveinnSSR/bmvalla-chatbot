@@ -30,34 +30,34 @@ Persónuleiki þinn:
  */
 export function getStructuredResponseInstructions() {
   return `
-Mikilvægt: Svörin þín verða að vera hnitmiðuð og skýr. Formatta svör þín á eftirfarandi hátt:
+Mikilvægt: Svörin þín verða að vera hnitmiðuð og skýr. 
 
-1. **Byrjaðu með hnitmiðað svar** (1-2 setningar) sem svarar kjarna spurningarinnar beint.
+1. Byrjaðu með beint svar við spurningunni (1-2 setningar).
 
-2. **Skipulagðu ítarlegri upplýsingar á skýran hátt:**
-   - Notaðu **feitletraðar fyrirsagnir** (EKKI nota # tákn)
-   - Notaðu stuttar málsgreinar með einföldu málfari
-   - Haltu bilum á milli málsgreina í lágmarki
+2. Notaðu einfalda uppsetningu:
+   - Bold texti fyrir fyrirsagnir
+   - Stuttar setningar
+   - Einfalt orðalag
+   - Einfaldur texti án flókinna tákna
 
-3. **Fyrir listaelementa:**
-   - Notaðu tölulista (1., 2., 3.) fyrir skref eða forgangsraðaðar upplýsingar
-   - Notaðu punktalista (•) fyrir eiginleika eða valkosti
-   - Haltu listaatriðum stuttum og hnitmiðuðum
+3. Fyrir lista:
+   - Notaðu einfaldar stjörnumerkingar (*)
+   - Haltu listaatriðum stuttum
 
-4. **Fyrir útreikninga:**
-   - Útskýrðu útreikning í 1-2 setningum
-   - Sýndu aðeins mikilvægustu tölurnar
-   - Túlkaðu niðurstöðurnar á skýran hátt
+4. Ef þú þarft að sýna útreikninga:
+   - Haltu þeim einföldum
+   - Útskýrðu niðurstöðuna skýrt
 
-5. **Í lokin:**
-   - Bjóddu upp á eina tengda spurningu sem notandinn gæti viljað spyrja næst
+5. Í lokin:
+   - Bjóddu upp á eina tengda spurningu
 
-MJÖG MIKILVÆGT:
-- Haltu heildarsvari undir 300 orðum, nema notandinn óski sérstaklega eftir ítarlegri upplýsingum
-- Notaðu ALDREI '#' tákn fyrir fyrirsagnir 
-- Forðastu mikil bil á milli málsgreina og lista
-- Gefðu mikilvægustu upplýsingarnar fyrst, minna mikilvægar upplýsingar síðar
-- Mundu að notandinn getur alltaf spurt nánar í framhaldinu - þú þarft ekki að segja allt í einu svari`;
+Mikilvægt:
+- Haltu svari undir 250 orðum
+- Notaðu bara grunnstafi (* og **) fyrir uppsetningu, ekki # eða önnur flókin Markdown-tákn
+- Forðastu stór bil milli textablokka
+- Haltu texta þínum einföldum
+- Notaðu bara einfaldar stjörnumerkingar (*) fyrir listaatriði
+- Mundu að notandinn getur alltaf spurt nánar`;
 }
 
 /**
@@ -161,7 +161,7 @@ export function getResponseTemplate(queryType) {
       structure: [
         "Stutt staðfesting á útreikningunum",
         "Útskýring á niðurstöðum með emoji",
-        "Myndræn framsetning á tölum (t.d. með textamyndum eða töflum)",
+        "Myndræn framsetning á tölum",
         "Praktískar ábendingar byggðar á niðurstöðunum",
         "Tillögur um næstu skref"
       ],
