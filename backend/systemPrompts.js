@@ -36,8 +36,8 @@ Mikilvægt: Svörin þín verða að vera vel skipulögð og hnitmiðuð. Format
 
 2. **Skipulagðu ítarlegri upplýsingar:**
    - Notaðu **feitletraðan texta** fyrir fyrirsagnir, ALDREI nota # merki fyrir fyrirsagnir
-   - Notaðu tölulista fyrir skref eða forgangsraðaðar upplýsingar
-   - Notaðu punktalista fyrir eiginleika eða valkosti
+   - Notaðu * punkta fyrir lista (ekki tölur) þegar þú ert að telja upp atriði sem eru ekki í sérstakri röð
+   - Notaðu 1. 2. 3. tölulista AÐEINS fyrir skref sem þarf að framkvæma í ákveðinni röð
    
 3. **Útreikninga:**
    - Ef þú ert að reikna, sýndu aðferðina á skiljanlegan hátt
