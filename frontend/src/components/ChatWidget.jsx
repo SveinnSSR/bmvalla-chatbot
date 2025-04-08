@@ -413,76 +413,63 @@ const ChatWidget = ({
     }
   };
 
-  // Processing Steps component (modified to be real-time)
+  // Processing Steps component (single-line version)
   const ThinkingSteps = () => (
     <div 
       style={{
         display: 'flex',
-        flexDirection: 'column',
+        justifyContent: 'flex-start',
         marginBottom: '16px',
         alignItems: 'flex-start',
-        width: '100%',
+        gap: '8px',
       }}
     >
-      <div style={{
-        display: 'flex',
-        justifyContent: 'flex-start',
-        alignItems: 'flex-start',
-        gap: '8px',
-        width: '100%',
-      }}>
-        <div
+      <div
+        style={{
+          width: '30px',
+          height: '30px',
+          borderRadius: '50%',
+          marginTop: '4px',
+          overflow: 'hidden',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <img
+          src="/logo.png"
+          alt="BM Vallá"
           style={{
-            width: '30px',
-            height: '30px',
-            borderRadius: '50%',
-            marginTop: '4px',
-            overflow: 'hidden',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+        />
+      </div>
+      <div
+        style={{
+          padding: '12px 16px',
+          borderRadius: '16px',
+          backgroundColor: '#f0f0f0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(0, 0, 0, 0.05)',
+          transition: 'all 0.2s ease',
+          animation: 'fadeIn 0.3s forwards',
+        }}
+      >
+        {/* Only show the latest step */}
+        <div 
+          className="thinking-step-single"
+          style={{
+            fontSize: '14px',
+            lineHeight: '1.5',
+            color: '#333',
+            opacity: 0.9,
           }}
         >
-          <img
-            src="/logo.png"
-            alt="BM Vallá"
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
-          />
-        </div>
-        
-        <div
-          style={{
-            padding: '12px 16px',
-            borderRadius: '16px',
-            backgroundColor: '#f0f0f0',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(0, 0, 0, 0.05)',
-            maxWidth: '90%',
-          }}
-        >
-          {processingSteps.map((step, i) => (
-            <div 
-              key={i} 
-              className="thinking-step"
-              style={{
-                fontSize: '14px',
-                lineHeight: '1.5',
-                color: '#333',
-                opacity: 0.9,
-                animation: 'fadeIn 0.3s forwards',
-              }}
-            >
-              {step}
-              {i === processingSteps.length - 1 && 
-                <span className="animated-dots" style={{ display: 'inline-block', marginLeft: '4px' }}></span>
-              }
-            </div>
-          ))}
+          {processingSteps[processingSteps.length - 1]}
+          <span className="animated-dots" style={{ display: 'inline-block', marginLeft: '4px' }}></span>
         </div>
       </div>
     </div>
@@ -881,13 +868,13 @@ const ChatWidget = ({
       <style jsx>{`
         @keyframes bm-valla-chat-typing {
           0% {
-              opacity: 0.4;
+            opacity: 0.4;
           }
           50% {
-              opacity: 1;
+            opacity: 1;
           }
           100% {
-              opacity: 0.4;
+            opacity: 0.4;
           }
         }
         
@@ -902,10 +889,23 @@ const ChatWidget = ({
           }
         }
         
-        .thinking-step {
-          opacity: 0;
-          animation: fadeIn 0.3s forwards;
-          padding: 4px 0;
+        @keyframes textChange {
+          0% {
+            opacity: 1;
+          }
+          20% {
+            opacity: 0;
+          }
+          80% {
+            opacity: 0;
+          }
+          100% {
+            opacity: 1;
+          }
+        }
+        
+        .thinking-step-single {
+          animation: textChange 0.5s forwards;
         }
         
         .animated-dots::after {
@@ -917,7 +917,7 @@ const ChatWidget = ({
         @media (max-width: 768px) {
           .bm-valla-chat-widget input, 
           .bm-valla-chat-widget button {
-              font-size: 16px !important; /* Prevent zoom on mobile */
+            font-size: 16px !important; /* Prevent zoom on mobile */
           }
         }
       `}</style>
