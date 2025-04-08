@@ -365,7 +365,7 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     // Generate response using OpenAI
     console.log('🤖 Generating AI response...');
-    addStep("🤖 Bý til svar með gervigreind...");
+    addStep("💭 Hugsa málið...");
     
     const aiStartTime = Date.now();
     
