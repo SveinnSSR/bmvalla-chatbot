@@ -365,7 +365,7 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     // Generate response using OpenAI
     console.log('🤖 Generating AI response...');
-    addStep("💭 Hugsa málið...");
+    addStep("🧠 Hugsa málið");
     
     const aiStartTime = Date.now();
     
@@ -1143,7 +1143,7 @@ async function processSSERequest(req, res, message, sessionId) {
     
     // Generate response using OpenAI
     console.log('🤖 Generating AI response...');
-    sendEvent({ type: 'processingStep', step: "💭 Hugsa málið..." });
+    sendEvent({ type: 'processingStep', step: "🧠 Hugsa málið" });
     
     const aiStartTime = Date.now();
     const aiResponse = await generateAIResponse(message, sessionContext, relevantKnowledge, calculationResult, contextualInstruction);
