@@ -8,11 +8,13 @@ import * as huseiningarCalculator from './huseiningar.js';
 import * as steyptarEiningarCalculator from './steyptarEiningar.js';  // Import the new calculator
 
 /**
- * Detects calculation intent from user query
+ * Detects calculation intent from user query with enhanced context awareness
  * @param {string} query - User's natural language query
+ * @param {Object|null} sessionContext - Session context for reference resolution
+ * @param {Array} relevantKnowledge - Knowledge from vector search
  * @returns {Object|null} - Detected calculation type and parameters, or null if no calculation intent found
  */
-export function detectCalculationIntent(query) {
+export function detectCalculationIntent(query, sessionContext = null, relevantKnowledge = []) {
   console.log(`🔍 Detecting calculation intent from: "${query}"`);
   
   // Normalize the query for easier pattern matching
@@ -20,6 +22,54 @@ export function detectCalculationIntent(query) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
     .replace(/\s+/g, " "); // Normalize whitespace
+
+  // Try to extract entities from the query
+  const extractedEntities = {
+    stoneType: extractStoneType(query),
+    dimensions: extractSizeSpecification(query),
+    quantity: extractQuantity(query)
+  };
+  
+  // Log extracted entities
+  console.log(`📝 Extracted entities from query:`, extractedEntities);
+  
+  // Check if we have referential terms (like "slíkt", "það", etc.)
+  const hasReferentialTerms = /\b(slikt|slik|slíkt|það|thad|þetta|thetta)\b/i.test(normalizedQuery);
+  
+  // If we have referential terms, try to resolve them from context
+  if (hasReferentialTerms && sessionContext && sessionContext.entities) {
+    console.log(`🔄 Detected referential terms, resolving from context`);
+    
+    // If no product was detected but there are previous products in context, use the most recent one
+    if (!extractedEntities.stoneType && sessionContext.entities.products && sessionContext.entities.products.length > 0) {
+      extractedEntities.stoneType = sessionContext.entities.products[sessionContext.entities.products.length - 1];
+      console.log(`🔄 Resolved product from context: ${extractedEntities.stoneType}`);
+    }
+    
+    // If no quantity was detected but there are previous quantities in context, use the most recent one
+    if (!extractedEntities.quantity && sessionContext.entities.quantities && sessionContext.entities.quantities.length > 0) {
+      extractedEntities.quantity = sessionContext.entities.quantities[sessionContext.entities.quantities.length - 1];
+      console.log(`🔄 Resolved quantity from context: ${extractedEntities.quantity}`);
+    }
+    
+    // If no dimensions were detected but there are previous dimensions in context, use the most recent one
+    if (!extractedEntities.dimensions && sessionContext.entities.dimensions && sessionContext.entities.dimensions.length > 0) {
+      extractedEntities.dimensions = sessionContext.entities.dimensions[sessionContext.entities.dimensions.length - 1];
+      console.log(`🔄 Resolved dimensions from context:`, extractedEntities.dimensions);
+    }
+  }
+  
+  // If we have relevant knowledge, try to extract product information from it
+  if (relevantKnowledge && relevantKnowledge.length > 0 && relevantKnowledge[0].similarity > 0.5) {
+    console.log(`📚 Examining knowledge item with similarity: ${relevantKnowledge[0].similarity}`);
+    
+    // Extract product type from knowledge if present and not already extracted
+    const knowledgeProduct = extractProductFromKnowledge(relevantKnowledge[0]);
+    if (knowledgeProduct && !extractedEntities.stoneType) {
+      extractedEntities.stoneType = knowledgeProduct;
+      console.log(`📚 Extracted product from knowledge: ${knowledgeProduct}`);
+    }
+  }
 
   // Patterns for different calculation types
   // TODO: As we expand pricing functionality to other product categories (steypa, sandur, etc.),
@@ -66,11 +116,16 @@ export function detectCalculationIntent(query) {
       /(\d+) stykki af ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
       /(\d+) (?:stk\.|stk|stykki) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
       
-      // NEW PATTERNS - for questions without specific quantities
+      // Patterns for questions without specific quantities
       /(?:hvað|hve) (?:kostar|kosta) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
       /(?:hvað|hvert) er verð(?:ið)? (?:á|fyrir) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
       /(?:hvað|hvert) væri verð(?:ið)? fyrir ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
       /verð(?:ið)? (?:á|fyrir) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
+      
+      // Reference patterns (for "slíkt", "það", etc.)
+      /(?:hvað|hvert) (?:kostar|kosta|er verð(?:ið)?|væri verð(?:ið)?) (?:á |fyrir |)(?:slíkt|slikt|slik|það|thad|þetta|thetta)/i,
+      /verð(?:ið)? (?:á |fyrir |)(?:slíkt|slikt|slik|það|thad|þetta|thetta)/i,
+      /(?:hvað|hve) (?:kostar|kosta) (?:það|thad|þetta|thetta)/i
     ],    
     
     // Concrete calculation patterns
@@ -177,6 +232,20 @@ export function detectCalculationIntent(query) {
     ]
   };
 
+  // Special handling for direct price inquiries with known product
+  const isPriceInquiry = /\b(?:verð|kosta|kostar|price)\b/i.test(normalizedQuery);
+  if (isPriceInquiry && extractedEntities.stoneType) {
+    console.log(`💰 Direct price inquiry detected for ${extractedEntities.stoneType}`);
+    return {
+      calculationType: 'priceCalculation',
+      parameters: {
+        stoneType: extractedEntities.stoneType,
+        quantity: extractedEntities.quantity || 1,
+        dimensions: extractedEntities.dimensions
+      }
+    };
+  }
+
   // Check for matches in patterns
   for (const [calculationType, patternList] of Object.entries(patterns)) {
     for (const pattern of patternList) {
@@ -186,36 +255,57 @@ export function detectCalculationIntent(query) {
           const match = normalizedQuery.match(pattern);
           
           // Extract quantity and product type from the pattern match
-          let quantity = 1; // Default to 1 if no quantity is specified
-          let productType = '';
+          let quantity = extractedEntities.quantity || 1; // Default to extracted or 1
+          let productType = extractedEntities.stoneType || ''; // Default to extracted
           
-          if (match) {
+          // Check for referential terms
+          const isReferential = /(?:slíkt|slikt|slik|það|thad|þetta|thetta)/i.test(normalizedQuery);
+          
+          if (match && !isReferential) {
             if (match.length >= 3 && !isNaN(parseInt(match[1], 10))) {
               // This is a pattern with quantity specified (e.g., "hvað kosta 50 modena hellur")
               quantity = parseInt(match[1], 10);
-              productType = match[2].trim();
+              productType = match[2]?.trim() || productType;
             } else if (match.length >= 2) {
               // This is a pattern without quantity (e.g., "hvað kosta modena hellur")
-              productType = match[1].trim();
-            }
-            
-            // Special case for Modena which is often mentioned specifically
-            if (productType.includes('modena')) {
-              productType = 'modena';
+              productType = match[1]?.trim() || productType;
             }
           }
           
-          // Extract any size specifications
-          const sizeSpec = extractSizeSpecification(query);
+          // Special case for Modena which is often mentioned specifically
+          if (productType.includes('modena')) {
+            productType = 'modena';
+          }
           
-          console.log(`✅ Detected ${calculationType} calculation intent for ${quantity} ${productType}${sizeSpec ? ` size ${sizeSpec.length}x${sizeSpec.width}${sizeSpec.thickness ? 'x'+sizeSpec.thickness : ''}` : ''}`);
+          // Store the extracted entities in session context if available
+          if (sessionContext && sessionContext.entities) {
+            if (productType) {
+              sessionContext.entities.products = sessionContext.entities.products || [];
+              sessionContext.entities.products.push(productType);
+              console.log(`💾 Stored product in session context: ${productType}`);
+            }
+            
+            if (quantity) {
+              sessionContext.entities.quantities = sessionContext.entities.quantities || [];
+              sessionContext.entities.quantities.push(quantity);
+              console.log(`💾 Stored quantity in session context: ${quantity}`);
+            }
+            
+            if (extractedEntities.dimensions) {
+              sessionContext.entities.dimensions = sessionContext.entities.dimensions || [];
+              sessionContext.entities.dimensions.push(extractedEntities.dimensions);
+              console.log(`💾 Stored dimensions in session context:`, extractedEntities.dimensions);
+            }
+          }
+          
+          console.log(`✅ Detected ${calculationType} calculation intent for ${quantity} ${productType}${extractedEntities.dimensions ? ` size ${extractedEntities.dimensions.length}x${extractedEntities.dimensions.width}${extractedEntities.dimensions.thickness ? 'x'+extractedEntities.dimensions.thickness : ''}` : ''}`);
           
           return {
             calculationType,
             parameters: {
               quantity: quantity,
               stoneType: productType,
-              dimensions: sizeSpec
+              dimensions: extractedEntities.dimensions
             }
           };
         }  
@@ -224,7 +314,7 @@ export function detectCalculationIntent(query) {
         const dimensions = extractDimensions(query);
         
         // Extract stone type if present
-        const stoneType = extractStoneType(query);
+        const stoneType = extractedEntities.stoneType || extractStoneType(query);
         
         // Extract thickness if present
         const thickness = extractThickness(query);
@@ -252,6 +342,19 @@ export function detectCalculationIntent(query) {
           ...steyptarEiningarParams
         };
         
+        // Store the extracted entities in session context if available
+        if (sessionContext && sessionContext.entities) {
+          if (stoneType) {
+            sessionContext.entities.products = sessionContext.entities.products || [];
+            sessionContext.entities.products.push(stoneType);
+          }
+          
+          if (dimensions && (dimensions.length || dimensions.width)) {
+            sessionContext.entities.dimensions = sessionContext.entities.dimensions || [];
+            sessionContext.entities.dimensions.push(dimensions);
+          }
+        }
+        
         console.log(`✅ Detected ${calculationType} calculation intent`);
         console.log(`📊 Extracted parameters:`, parameters);
         
@@ -264,7 +367,7 @@ export function detectCalculationIntent(query) {
   }
 
   // If no intent was detected but it might be price-related, try fallback detection
-  const fallbackIntent = detectFallbackPriceIntent(query);
+  const fallbackIntent = detectFallbackPriceIntent(query, sessionContext, relevantKnowledge);
   if (fallbackIntent) {
     return fallbackIntent;
   }
@@ -556,6 +659,48 @@ function extractDimensions(query) {
 }
 
 /**
+ * Extracts quantity from a query
+ * @param {string} query - User's natural language query
+ * @returns {number|null} - Extracted quantity or null if not found
+ */
+function extractQuantity(query) {
+  const normalizedQuery = query.toLowerCase();
+  console.log(`🔍 Extracting quantity from query`);
+  
+  // Various patterns to match quantity expressions
+  const patterns = [
+    /(\d+)\s*(?:stykki|stk|stk\.|pcs)/i,  // 20 stykki, 30 stk, 50 pcs
+    /(\d+)\s*(?:hellur|hellum)/i,  // 100 hellur, 200 hellum
+    /(\d+)\s*(?:af|fyrir)/i,      // 500 af, 1000 fyrir
+  ];
+  
+  for (const pattern of patterns) {
+    const match = normalizedQuery.match(pattern);
+    if (match && match[1]) {
+      const quantity = parseInt(match[1], 10);
+      console.log(`🔢 Found quantity: ${quantity}`);
+      return quantity;
+    }
+  }
+  
+  // Look for standalone numbers that might represent quantities
+  const standaloneNumberPattern = /\b(\d+)\b/;
+  const standaloneMatch = normalizedQuery.match(standaloneNumberPattern);
+  
+  if (standaloneMatch && standaloneMatch[1]) {
+    // Only consider it a quantity if it's a reasonably sized number (to avoid confusing with dimensions)
+    const potentialQuantity = parseInt(standaloneMatch[1], 10);
+    if (potentialQuantity > 10 && potentialQuantity < 100000) {  // Arbitrary range for reasonable quantities
+      console.log(`🔢 Found potential quantity from standalone number: ${potentialQuantity}`);
+      return potentialQuantity;
+    }
+  }
+  
+  console.log(`⚠️ No quantity found`);
+  return null;
+}
+
+/**
  * Extracts stone type from a query
  * @param {string} query - User's natural language query
  * @returns {string|null} - Extracted stone type or null if not found
@@ -564,7 +709,9 @@ function extractStoneType(query) {
   const normalizedQuery = query.toLowerCase();
   console.log(`🔍 Extracting stone type from query`);
   
+  // Prioritize modena in the stone types list
   const stoneTypes = [
+    { pattern: /modena/i, type: "modena" }, // Moved to top for priority
     { pattern: /fornstein/i, type: "fornsteinn" },
     { pattern: /herragarðsstein/i, type: "herragarðssteinn" },
     { pattern: /jötunstein/i, type: "jötunsteinn" },
@@ -574,7 +721,6 @@ function extractStoneType(query) {
     { pattern: /vínarstein/i, type: "vínarsteinn" },
     { pattern: /grassstein/i, type: "grassteinn" },
     { pattern: /borgarhellu/i, type: "borgarhella" },
-    { pattern: /modena/i, type: "modena" }, // Add this specifically to detect Modena
     { pattern: /hellu[^r]/i, type: "hella" } // Match "hellu" but not "hellur"
   ];
   
@@ -1029,11 +1175,75 @@ function extractSteyptarEiningarParameters(query, calculationType) {
 }
 
 /**
+ * Extracts product information from a knowledge item
+ * @param {Object} knowledgeItem - Knowledge item from vector search
+ * @returns {string|null} - Product name or null if not found
+ */
+function extractProductFromKnowledge(knowledgeItem) {
+  if (!knowledgeItem || !knowledgeItem.text) {
+    return null;
+  }
+  
+  console.log(`🔍 Extracting product from knowledge item`);
+  
+  // If the knowledge item has metadata with product information, use that
+  if (knowledgeItem.metadata && knowledgeItem.metadata.productType) {
+    console.log(`📚 Found product in metadata: ${knowledgeItem.metadata.productType}`);
+    return knowledgeItem.metadata.productType;
+  }
+  
+  // Try to extract product name from the text
+  const normalizedText = knowledgeItem.text.toLowerCase();
+  
+  // Check for product names in the text
+  const productNames = [
+    "modena",
+    "fornsteinn", 
+    "herragarðssteinn", 
+    "jötunsteinn",
+    "óðalssteinn",
+    "rómarsteinn",
+    "torgsteinn",
+    "vínarsteinn",
+    "grassteinn",
+    "borgarhella",
+    "hella"
+  ];
+  
+  for (const productName of productNames) {
+    if (normalizedText.includes(productName.toLowerCase())) {
+      console.log(`📚 Found product in text: ${productName}`);
+      return productName;
+    }
+  }
+  
+  // Try to extract from possible title patterns
+  const titlePattern = /^([A-ZÁÉÍÓÚÝÞÆÖa-záéíóúýþæö]+)(?:\.|:|\s-)/;
+  const titleMatch = knowledgeItem.text.match(titlePattern);
+  
+  if (titleMatch && titleMatch[1]) {
+    const possibleProduct = titleMatch[1].trim().toLowerCase();
+    console.log(`📚 Possible product from title: ${possibleProduct}`);
+    
+    // Verify it's actually a product we know about
+    if (productNames.some(p => possibleProduct.includes(p.toLowerCase()))) {
+      console.log(`📚 Verified product from title: ${possibleProduct}`);
+      return possibleProduct;
+    }
+  }
+  
+  console.log(`⚠️ No product found in knowledge item`);
+  return null;
+}
+
+/**
  * Performs a fallback check to detect price-related queries
  * @param {string} query - User's query
+ * @param {Object|null} sessionContext - Session context for reference resolution
+ * @param {Array} relevantKnowledge - Knowledge from vector search
  * @returns {Object|null} - Calculation intent or null
  */
-function detectFallbackPriceIntent(query) {
+function detectFallbackPriceIntent(query, sessionContext = null, relevantKnowledge = []) {
   // Normalize the query
   const normalizedQuery = query.toLowerCase().trim();
   
@@ -1045,21 +1255,59 @@ function detectFallbackPriceIntent(query) {
     return null;
   }
   
-  // Try to extract a product name
-  const productType = extractStoneType(query);
+  console.log(`🔍 Price-related term detected, trying fallback detection`);
+  
+  // Try to extract a product name from the query
+  let productType = extractStoneType(query);
+  
+  // If no product type is found in the query, try to get it from context
+  if (!productType && sessionContext && sessionContext.entities && sessionContext.entities.products && sessionContext.entities.products.length > 0) {
+    productType = sessionContext.entities.products[sessionContext.entities.products.length - 1];
+    console.log(`🔄 Using product from context: ${productType}`);
+  }
+  
+  // If still no product type, try to get it from knowledge
+  if (!productType && relevantKnowledge && relevantKnowledge.length > 0 && relevantKnowledge[0].similarity > 0.5) {
+    productType = extractProductFromKnowledge(relevantKnowledge[0]);
+    console.log(`📚 Using product from knowledge: ${productType}`);
+  }
+  
+  // If we still don't have a product type, we can't proceed
   if (!productType) {
+    console.log(`⚠️ No product type found for price calculation`);
     return null;
   }
   
-  // Extract any size specifications
-  const dimensions = extractSizeSpecification(query);
+  // Try to extract quantity
+  let quantity = extractQuantity(query);
   
-  console.log(`🔍 Fallback price detection found product: ${productType}`);
+  // If no quantity in query, try to get it from context
+  if (!quantity && sessionContext && sessionContext.entities && sessionContext.entities.quantities && sessionContext.entities.quantities.length > 0) {
+    quantity = sessionContext.entities.quantities[sessionContext.entities.quantities.length - 1];
+    console.log(`🔄 Using quantity from context: ${quantity}`);
+  }
+  
+  // Default to 1 if no quantity found
+  if (!quantity) {
+    quantity = 1;
+    console.log(`📊 Using default quantity: 1`);
+  }
+  
+  // Extract any size specifications
+  let dimensions = extractSizeSpecification(query);
+  
+  // If no dimensions in query, try to get them from context
+  if (!dimensions && sessionContext && sessionContext.entities && sessionContext.entities.dimensions && sessionContext.entities.dimensions.length > 0) {
+    dimensions = sessionContext.entities.dimensions[sessionContext.entities.dimensions.length - 1];
+    console.log(`🔄 Using dimensions from context:`, dimensions);
+  }
+  
+  console.log(`🔍 Fallback price detection found product: ${productType}, quantity: ${quantity}`);
   
   return {
     calculationType: 'priceCalculation',
     parameters: {
-      quantity: 1, // Default to 1 for basic pricing
+      quantity: quantity,
       stoneType: productType,
       dimensions: dimensions
     }

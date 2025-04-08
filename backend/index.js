@@ -318,11 +318,11 @@ app.post('/chat', verifyApiKey, async (req, res) => {
       addStep("🔍 Leita að fleiri upplýsingum...");
     }
     
-    // Check for calculation intent
+    // Check for calculation intent with enhanced context and knowledge
     console.log('🧮 Checking for calculation intent...');
     addStep("🧮 Athuga hvort þörf sé á útreikningum...");
     
-    const calculationIntent = detectCalculationIntent(message);
+    const calculationIntent = detectCalculationIntent(message, sessionContext, relevantKnowledge);
     let calculationResult = null;
     
     if (calculationIntent) {
@@ -365,7 +365,7 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     // Generate response using OpenAI
     console.log('🤖 Generating AI response...');
-    addStep("🧠 Hugsa málið");
+    addStep("💭 Hugsa málið");
     
     const aiStartTime = Date.now();
     
@@ -639,6 +639,11 @@ function getSessionContext(sessionId) {
         mainGoal: null, // e.g., "building_patio", "concrete_selection"
         projectDetails: {} // Store specifics like dimensions, materials, etc.
       },
+      entities: {
+        products: [],      // Track mentioned products
+        dimensions: [],    // Track mentioned dimensions
+        quantities: []     // Track mentioned quantities
+      },
       conversationSummary: "", // Periodically updated summary
       createdAt: new Date(),
       lastUpdated: new Date()
@@ -737,10 +742,19 @@ function detectProjectIntent(userMessage, sessionContext) {
   const match = userMessage.match(dimensionsPattern);
   
   if (match) {
-    sessionContext.userIntent.projectDetails.dimensions = {
+    const dimensions = {
       length: parseFloat(match[1].replace(',', '.')),
       width: parseFloat(match[2].replace(',', '.'))
     };
+    
+    sessionContext.userIntent.projectDetails.dimensions = dimensions;
+    
+    // Also store in entities for reference resolution
+    if (!sessionContext.entities.dimensions) {
+      sessionContext.entities.dimensions = [];
+    }
+    sessionContext.entities.dimensions.push(dimensions);
+    
     console.log(`🧠 Extracted dimensions: ${match[1]}x${match[2]} meters`);
   }
   
@@ -777,10 +791,17 @@ function getIcelandicIntentName(intent) {
  */
 function getIcelandicCalculationType(calculationType) {
   const calculationNames = {
-    paving_area: 'Flatarmál hellna',
-    concrete_volume: 'Rúmmál steypu',
+    priceCalculation: 'Verðútreikningur',
+    pavingStones: 'Flatarmál hellna',
+    concreteVolume: 'Rúmmál steypu',
+    materialRequirements: 'Efnisþörf',
+    baseSand: 'Hellusandur',
+    jointSand: 'Fúgusandur',
+    completeProject: 'Heildarkostnaður',
+    carbonFootprint: 'Kolefnisspor',
     material_cost: 'Efniskostnaður',
     concrete_floor: 'Steypugólf',
+    columnVolume: 'Rúmmál súlu',
     wall_cladding: 'Útveggjaklæðning',
     soil_volume: 'Jarðvegsmagn'
   };
@@ -832,6 +853,13 @@ function generateContextualInstruction(sessionContext) {
   if (sessionContext.topics.includes('umhverfisvænt')) {
     instruction += 'Notandinn hefur áhuga á umhverfissjónarmiðum. Bentu á umhverfisvottaðar vörur þegar við á. ';
     console.log(`🧠 Adding environmental focus instruction`);
+  }
+  
+  // If a specific product has been detected in the conversation
+  if (sessionContext.entities && sessionContext.entities.products && sessionContext.entities.products.length > 0) {
+    const latestProduct = sessionContext.entities.products[sessionContext.entities.products.length - 1];
+    instruction += `Í samtalinu er verið að ræða um "${latestProduct}". Hafðu það í huga við svörun. `;
+    console.log(`🧠 Adding product focus instruction: ${latestProduct}`);
   }
   
   if (instruction) {
@@ -1096,11 +1124,11 @@ async function processSSERequest(req, res, message, sessionId) {
       sendEvent({ type: 'processingStep', step: "🔍 Leita að fleiri upplýsingum..." });
     }
     
-    // Check for calculation intent
+    // Check for calculation intent with enhanced context awareness
     console.log('🧮 Checking for calculation intent...');
     sendEvent({ type: 'processingStep', step: "🧮 Athuga hvort þörf sé á útreikningum..." });
     
-    const calculationIntent = detectCalculationIntent(message);
+    const calculationIntent = detectCalculationIntent(message, sessionContext, relevantKnowledge);
     let calculationResult = null;
     
     if (calculationIntent) {
@@ -1143,7 +1171,7 @@ async function processSSERequest(req, res, message, sessionId) {
     
     // Generate response using OpenAI
     console.log('🤖 Generating AI response...');
-    sendEvent({ type: 'processingStep', step: "🧠 Hugsa málið" });
+    sendEvent({ type: 'processingStep', step: "💭 Hugsa málið" });
     
     const aiStartTime = Date.now();
     const aiResponse = await generateAIResponse(message, sessionContext, relevantKnowledge, calculationResult, contextualInstruction);
