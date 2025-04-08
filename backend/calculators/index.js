@@ -59,11 +59,18 @@ export function detectCalculationIntent(query) {
     // Price calculation patterns
     // Price calculation patterns for hellur products
     priceCalculation: [
+      // Patterns with quantities
       /(?:hvað|hve) (?:kostar|kosta) (\d+) (?:stykki af |stk af |stk\. af |)?([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
       /verð(?:ið)? fyrir (\d+) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
       /(?:hvað|hve) (?:kosta(?:r)?) (\d+) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
       /(\d+) stykki af ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
       /(\d+) (?:stk\.|stk|stykki) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
+      
+      // NEW PATTERNS - for questions without specific quantities
+      /(?:hvað|hve) (?:kostar|kosta) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
+      /(?:hvað|hvert) er verð(?:ið)? (?:á|fyrir) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
+      /(?:hvað|hvert) væri verð(?:ið)? fyrir ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
+      /verð(?:ið)? (?:á|fyrir) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
     ],    
     
     // Concrete calculation patterns
@@ -179,12 +186,18 @@ export function detectCalculationIntent(query) {
           const match = normalizedQuery.match(pattern);
           
           // Extract quantity and product type from the pattern match
-          let quantity = 1;
+          let quantity = 1; // Default to 1 if no quantity is specified
           let productType = '';
           
-          if (match && match.length >= 3) {
-            quantity = parseInt(match[1], 10);
-            productType = match[2].trim();
+          if (match) {
+            if (match.length >= 3 && !isNaN(parseInt(match[1], 10))) {
+              // This is a pattern with quantity specified (e.g., "hvað kosta 50 modena hellur")
+              quantity = parseInt(match[1], 10);
+              productType = match[2].trim();
+            } else if (match.length >= 2) {
+              // This is a pattern without quantity (e.g., "hvað kosta modena hellur")
+              productType = match[1].trim();
+            }
             
             // Special case for Modena which is often mentioned specifically
             if (productType.includes('modena')) {
@@ -248,6 +261,12 @@ export function detectCalculationIntent(query) {
         };
       }
     }
+  }
+
+  // If no intent was detected but it might be price-related, try fallback detection
+  const fallbackIntent = detectFallbackPriceIntent(query);
+  if (fallbackIntent) {
+    return fallbackIntent;
   }
 
   console.log(`⚠️ No calculation intent detected`);
@@ -555,6 +574,7 @@ function extractStoneType(query) {
     { pattern: /vínarstein/i, type: "vínarsteinn" },
     { pattern: /grassstein/i, type: "grassteinn" },
     { pattern: /borgarhellu/i, type: "borgarhella" },
+    { pattern: /modena/i, type: "modena" }, // Add this specifically to detect Modena
     { pattern: /hellu[^r]/i, type: "hella" } // Match "hellu" but not "hellur"
   ];
   
@@ -1006,4 +1026,42 @@ function extractSteyptarEiningarParameters(query, calculationType) {
   }
   
   return params;
+}
+
+/**
+ * Performs a fallback check to detect price-related queries
+ * @param {string} query - User's query
+ * @returns {Object|null} - Calculation intent or null
+ */
+function detectFallbackPriceIntent(query) {
+  // Normalize the query
+  const normalizedQuery = query.toLowerCase().trim();
+  
+  // Check for common price-related keywords
+  const priceKeywords = ['verð', 'kosta', 'kostar', 'price'];
+  const containsPriceKeyword = priceKeywords.some(keyword => normalizedQuery.includes(keyword));
+  
+  if (!containsPriceKeyword) {
+    return null;
+  }
+  
+  // Try to extract a product name
+  const productType = extractStoneType(query);
+  if (!productType) {
+    return null;
+  }
+  
+  // Extract any size specifications
+  const dimensions = extractSizeSpecification(query);
+  
+  console.log(`🔍 Fallback price detection found product: ${productType}`);
+  
+  return {
+    calculationType: 'priceCalculation',
+    parameters: {
+      quantity: 1, // Default to 1 for basic pricing
+      stoneType: productType,
+      dimensions: dimensions
+    }
+  };
 }
