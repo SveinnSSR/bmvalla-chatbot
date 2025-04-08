@@ -27,8 +27,8 @@ const ChatWidget = ({
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   // Add state for processing steps (real-time action tracking)
   const [processingSteps, setProcessingSteps] = useState([]);
-  // Track the currently visible processing step for animation
-  const [visibleSteps, setVisibleSteps] = useState(0);
+  // Track SSE connection
+  const [sseConnection, setSseConnection] = useState(null);
 
   // Add window resize listener for responsive design
   useEffect(() => {
@@ -103,7 +103,7 @@ const ChatWidget = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, visibleSteps]);
+  }, [messages, processingSteps]);
 
   // Initial welcome message
   useEffect(() => {
@@ -116,20 +116,15 @@ const ChatWidget = ({
     }]);
   }, []);
 
-  // Animation effect for processing steps
+  // Clean up SSE connection when component unmounts
   useEffect(() => {
-    if (processingSteps.length === 0 || visibleSteps >= processingSteps.length) {
-      return;
-    }
-    
-    // Show next step every 800ms
-    const timer = setTimeout(() => {
-      setVisibleSteps(prev => prev + 1);
-      scrollToBottom();
-    }, 800);
-    
-    return () => clearTimeout(timer);
-  }, [processingSteps, visibleSteps]);
+    return () => {
+      if (sseConnection) {
+        console.log("Closing SSE connection on unmount");
+        sseConnection.close();
+      }
+    };
+  }, [sseConnection]);
 
   // Function to determine if a message should show feedback options
   const shouldShowFeedback = (message) => {
@@ -214,7 +209,7 @@ const ChatWidget = ({
     }
   };
 
-  // Handle message sending
+  // Handle message sending with SSE
   const handleSend = async () => {
     if (!inputValue.trim() || isTyping) return;
     
@@ -229,15 +224,146 @@ const ChatWidget = ({
     }]);
     
     setIsTyping(true);
-    // Reset processing steps and visible steps
+    // Reset processing steps
     setProcessingSteps([]);
-    setVisibleSteps(0);
     
     // Check for session timeout before sending
     checkSessionTimeout();
     
+    // Close existing SSE connection if any
+    if (sseConnection) {
+      sseConnection.close();
+    }
+    
     try {
-      console.log("Sending request with API key:", apiKey);  
+      // Create the SSE URL
+      // If server supports /chat-sse endpoint use it, otherwise fallback to regular chat
+      const baseUrl = webhookUrl.replace('/chat', '');
+      const sseUrl = `${baseUrl}/chat-sse`;
+      
+      console.log("Establishing SSE connection...");
+      
+      // Create the URL with query parameters for SSE
+      const url = `${sseUrl}?sessionId=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(messageText)}&apiKey=${encodeURIComponent(apiKey)}`;
+      
+      // Create EventSource for SSE connection
+      const eventSource = new EventSource(url);
+      setSseConnection(eventSource);
+      
+      // Handle connection open
+      eventSource.onopen = () => {
+        console.log("SSE connection established");
+      };
+      
+      // Handle incoming messages
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("SSE event received:", data.type);
+          
+          switch (data.type) {
+            case 'connected':
+              console.log("SSE connection confirmed by server");
+              break;
+              
+            case 'processingStep':
+              // Add new processing step
+              setProcessingSteps(prev => [...prev, data.step]);
+              scrollToBottom();
+              break;
+              
+            case 'complete':
+              // Final response received
+              setIsTyping(false);
+              
+              // Add the bot message
+              const botMessageId = 'bot-msg-' + Date.now();
+              setMessages(prev => [...prev, {
+                type: 'bot',
+                content: data.message,
+                id: botMessageId
+              }]);
+              
+              // Store PostgreSQL ID if provided
+              if (data.postgresqlMessageId) {
+                setMessagePostgresqlIds(prev => ({
+                  ...prev,
+                  [botMessageId]: data.postgresqlMessageId
+                }));
+              }
+              
+              // Clean up
+              eventSource.close();
+              setSseConnection(null);
+              break;
+              
+            case 'error':
+              // Handle error
+              console.error("SSE error:", data.message);
+              setIsTyping(false);
+              
+              setMessages(prev => [...prev, {
+                type: 'bot',
+                content: data.message || "Því miður kom upp villa. Vinsamlegast reyndu aftur síðar.",
+                id: 'bot-error-' + Date.now()
+              }]);
+              
+              // Clean up
+              eventSource.close();
+              setSseConnection(null);
+              break;
+              
+            case 'ping':
+              // Keep-alive ping
+              console.log("Received ping from server");
+              break;
+              
+            default:
+              console.log("Unknown event type:", data.type);
+          }
+        } catch (error) {
+          console.error("Error processing SSE message:", error);
+        }
+      };
+      
+      // Handle errors
+      eventSource.onerror = (error) => {
+        console.error("SSE connection error:", error);
+        
+        // If SSE fails, fall back to regular request
+        if (error.target.readyState === EventSource.CLOSED) {
+          console.log("SSE connection failed or closed, falling back to regular request");
+          eventSource.close();
+          setSseConnection(null);
+          handleRegularRequest(messageText);
+        } else {
+          // For other errors, just show an error message
+          setIsTyping(false);
+          setMessages(prev => [...prev, {
+            type: 'bot',
+            content: "Tenging við þjón rofnaði. Vinsamlegast reyndu aftur síðar.",
+            id: 'bot-error-' + Date.now()
+          }]);
+          
+          // Clean up
+          eventSource.close();
+          setSseConnection(null);
+        }
+      };
+      
+    } catch (error) {
+      console.error('Error setting up SSE:', error);
+      
+      // Fall back to regular request if SSE fails
+      handleRegularRequest(messageText);
+    }
+  };
+
+  // Fallback to regular request if SSE fails
+  const handleRegularRequest = async (messageText) => {
+    try {
+      console.log("Falling back to regular request...");
+      
       const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
@@ -248,48 +374,26 @@ const ChatWidget = ({
           message: messageText,
           sessionId: sessionId
         })
-      });   
-      // Log the response status
-      console.log("Response status:", response.status);
-
+      });
+      
       const data = await response.json();
       
-      // Handle processing steps if they exist in the response
+      // If we got processing steps, show them
       if (data.processingSteps && Array.isArray(data.processingSteps)) {
         setProcessingSteps(data.processingSteps);
-        // Start animation by showing first step
-        setVisibleSteps(1);
       }
       
-      // We'll keep the typing indicator until all steps are shown
-      if (!data.processingSteps || data.processingSteps.length === 0) {
-        setIsTyping(false);
-      }
+      setIsTyping(false);
       
-      // Normal bot response handling with unique ID for feedback tracking
+      // Add bot message
       const botMessageId = 'bot-msg-' + Date.now();
+      setMessages(prev => [...prev, {
+        type: 'bot',
+        content: data.message,
+        id: botMessageId
+      }]);
       
-      // Only add the final message after all steps are shown or immediately if no steps
-      if (!data.processingSteps || data.processingSteps.length === 0) {
-        setMessages(prev => [...prev, {
-          type: 'bot',
-          content: data.message,
-          id: botMessageId
-        }]);
-      } else {
-        // Add message after a delay to allow all steps to be shown
-        const stepsDelay = data.processingSteps.length * 800 + 300; // 800ms per step + extra padding
-        setTimeout(() => {
-          setIsTyping(false);
-          setMessages(prev => [...prev, {
-            type: 'bot',
-            content: data.message,
-            id: botMessageId
-          }]);
-        }, stepsDelay);
-      }
-
-      // Store PostgreSQL ID if provided in response
+      // Store PostgreSQL ID if provided
       if (data.postgresqlMessageId) {
         setMessagePostgresqlIds(prev => ({
           ...prev,
@@ -297,15 +401,10 @@ const ChatWidget = ({
         }));
       }
       
-      // If there's calculation result, you could handle it here
-      if (data.calculationResult) {
-        console.log('Calculation result:', data.calculationResult);
-      }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error with regular request:', error);
+      
       setIsTyping(false);
-      setProcessingSteps([]);
-      setVisibleSteps(0);
       setMessages(prev => [...prev, {
         type: 'bot',
         content: "Því miður kom upp villa. Vinsamlegast reyndu aftur síðar.",
@@ -314,7 +413,7 @@ const ChatWidget = ({
     }
   };
 
-  // Processing Steps component
+  // Processing Steps component (modified to be real-time)
   const ThinkingSteps = () => (
     <div 
       style={{
@@ -366,7 +465,7 @@ const ChatWidget = ({
             maxWidth: '90%',
           }}
         >
-          {processingSteps.slice(0, visibleSteps).map((step, i) => (
+          {processingSteps.map((step, i) => (
             <div 
               key={i} 
               className="thinking-step"
@@ -379,7 +478,7 @@ const ChatWidget = ({
               }}
             >
               {step}
-              {i === visibleSteps - 1 && 
+              {i === processingSteps.length - 1 && 
                 <span className="animated-dots" style={{ display: 'inline-block', marginLeft: '4px' }}></span>
               }
             </div>
@@ -389,7 +488,7 @@ const ChatWidget = ({
     </div>
   );
 
-  // Typing indicator component
+  // Typing indicator component (fallback for when SSE isn't showing steps yet)
   const TypingIndicator = () => (
     <div
       style={{
@@ -717,13 +816,13 @@ const ChatWidget = ({
             </div>
           ))}
 
-          {/* Show thinking steps if we have processing steps and not all are shown yet */}
-          {isTyping && processingSteps.length > 0 && visibleSteps <= processingSteps.length && (
+          {/* Show processing steps if we have any */}
+          {isTyping && processingSteps.length > 0 && (
             <ThinkingSteps />
           )}
           
-          {/* Show traditional typing indicator only if we don't have processing steps */}
-          {isTyping && (processingSteps.length === 0 || visibleSteps > processingSteps.length) && (
+          {/* Show traditional typing indicator if we don't have processing steps yet */}
+          {isTyping && processingSteps.length === 0 && (
             <TypingIndicator />
           )}
           
