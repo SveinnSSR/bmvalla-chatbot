@@ -25,6 +25,10 @@ const ChatWidget = ({
   const [messagePostgresqlIds, setMessagePostgresqlIds] = useState({});
   // Add window width tracking for responsive design
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  // Add state for processing steps (real-time action tracking)
+  const [processingSteps, setProcessingSteps] = useState([]);
+  // Track the currently visible processing step for animation
+  const [visibleSteps, setVisibleSteps] = useState(0);
 
   // Add window resize listener for responsive design
   useEffect(() => {
@@ -99,7 +103,7 @@ const ChatWidget = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, visibleSteps]);
 
   // Initial welcome message
   useEffect(() => {
@@ -111,6 +115,21 @@ const ChatWidget = ({
       id: 'welcome-msg-' + Date.now()
     }]);
   }, []);
+
+  // Animation effect for processing steps
+  useEffect(() => {
+    if (processingSteps.length === 0 || visibleSteps >= processingSteps.length) {
+      return;
+    }
+    
+    // Show next step every 800ms
+    const timer = setTimeout(() => {
+      setVisibleSteps(prev => prev + 1);
+      scrollToBottom();
+    }, 800);
+    
+    return () => clearTimeout(timer);
+  }, [processingSteps, visibleSteps]);
 
   // Function to determine if a message should show feedback options
   const shouldShowFeedback = (message) => {
@@ -210,6 +229,9 @@ const ChatWidget = ({
     }]);
     
     setIsTyping(true);
+    // Reset processing steps and visible steps
+    setProcessingSteps([]);
+    setVisibleSteps(0);
     
     // Check for session timeout before sending
     checkSessionTimeout();
@@ -231,15 +253,41 @@ const ChatWidget = ({
       console.log("Response status:", response.status);
 
       const data = await response.json();
-      setIsTyping(false);
+      
+      // Handle processing steps if they exist in the response
+      if (data.processingSteps && Array.isArray(data.processingSteps)) {
+        setProcessingSteps(data.processingSteps);
+        // Start animation by showing first step
+        setVisibleSteps(1);
+      }
+      
+      // We'll keep the typing indicator until all steps are shown
+      if (!data.processingSteps || data.processingSteps.length === 0) {
+        setIsTyping(false);
+      }
       
       // Normal bot response handling with unique ID for feedback tracking
       const botMessageId = 'bot-msg-' + Date.now();
-      setMessages(prev => [...prev, {
-        type: 'bot',
-        content: data.message,
-        id: botMessageId
-      }]);
+      
+      // Only add the final message after all steps are shown or immediately if no steps
+      if (!data.processingSteps || data.processingSteps.length === 0) {
+        setMessages(prev => [...prev, {
+          type: 'bot',
+          content: data.message,
+          id: botMessageId
+        }]);
+      } else {
+        // Add message after a delay to allow all steps to be shown
+        const stepsDelay = data.processingSteps.length * 800 + 300; // 800ms per step + extra padding
+        setTimeout(() => {
+          setIsTyping(false);
+          setMessages(prev => [...prev, {
+            type: 'bot',
+            content: data.message,
+            id: botMessageId
+          }]);
+        }, stepsDelay);
+      }
 
       // Store PostgreSQL ID if provided in response
       if (data.postgresqlMessageId) {
@@ -256,6 +304,8 @@ const ChatWidget = ({
     } catch (error) {
       console.error('Error:', error);
       setIsTyping(false);
+      setProcessingSteps([]);
+      setVisibleSteps(0);
       setMessages(prev => [...prev, {
         type: 'bot',
         content: "Því miður kom upp villa. Vinsamlegast reyndu aftur síðar.",
@@ -263,6 +313,81 @@ const ChatWidget = ({
       }]);
     }
   };
+
+  // Processing Steps component
+  const ThinkingSteps = () => (
+    <div 
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        marginBottom: '16px',
+        alignItems: 'flex-start',
+        width: '100%',
+      }}
+    >
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-start',
+        alignItems: 'flex-start',
+        gap: '8px',
+        width: '100%',
+      }}>
+        <div
+          style={{
+            width: '30px',
+            height: '30px',
+            borderRadius: '50%',
+            marginTop: '4px',
+            overflow: 'hidden',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          <img
+            src="/logo.png"
+            alt="BM Vallá"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+        </div>
+        
+        <div
+          style={{
+            padding: '12px 16px',
+            borderRadius: '16px',
+            backgroundColor: '#f0f0f0',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
+            maxWidth: '90%',
+          }}
+        >
+          {processingSteps.slice(0, visibleSteps).map((step, i) => (
+            <div 
+              key={i} 
+              className="thinking-step"
+              style={{
+                fontSize: '14px',
+                lineHeight: '1.5',
+                color: '#333',
+                opacity: 0.9,
+                animation: 'fadeIn 0.3s forwards',
+              }}
+            >
+              {step}
+              {i === visibleSteps - 1 && 
+                <span className="animated-dots" style={{ display: 'inline-block', marginLeft: '4px' }}></span>
+              }
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   // Typing indicator component
   const TypingIndicator = () => (
@@ -592,7 +717,16 @@ const ChatWidget = ({
             </div>
           ))}
 
-          {isTyping && <TypingIndicator />}
+          {/* Show thinking steps if we have processing steps and not all are shown yet */}
+          {isTyping && processingSteps.length > 0 && visibleSteps <= processingSteps.length && (
+            <ThinkingSteps />
+          )}
+          
+          {/* Show traditional typing indicator only if we don't have processing steps */}
+          {isTyping && (processingSteps.length === 0 || visibleSteps > processingSteps.length) && (
+            <TypingIndicator />
+          )}
+          
           <div ref={messagesEndRef} />
         </div>
       )}
@@ -644,7 +778,7 @@ const ChatWidget = ({
         </div>
       )}
 
-      {/* Add keyframes for typing animation */}
+      {/* Add keyframes for animations */}
       <style jsx>{`
         @keyframes bm-valla-chat-typing {
           0% {
@@ -656,6 +790,29 @@ const ChatWidget = ({
           100% {
               opacity: 0.4;
           }
+        }
+        
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(5px);
+          }
+          to {
+            opacity: 0.9;
+            transform: translateY(0);
+          }
+        }
+        
+        .thinking-step {
+          opacity: 0;
+          animation: fadeIn 0.3s forwards;
+          padding: 4px 0;
+        }
+        
+        .animated-dots::after {
+          content: '...';
+          display: inline-block;
+          animation: bm-valla-chat-typing 1.2s infinite;
         }
         
         @media (max-width: 768px) {
