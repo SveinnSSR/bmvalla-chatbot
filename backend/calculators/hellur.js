@@ -72,12 +72,14 @@ export function calculatePavingStones(length, width, stoneType, stoneSize = null
  * Provides a simple price calculation without area measurements
  * @param {string} stoneType - Type of stone (e.g., "hella", "modena")
  * @param {number} quantity - Number of stones requested
+ * @param {Object} dimensions - Optional dimensions specification {length, width, thickness}
  * @returns {Object} - Calculation result with pricing details
  */
-export function calculatePrice(stoneType, quantity = 1) {
+export function calculatePrice(stoneType, quantity = 1, dimensions = null) {
   console.log(`calculatePrice called with:`, {
     stoneType,
-    quantity
+    quantity,
+    dimensions
   });
   
   // Input validation
@@ -85,19 +87,38 @@ export function calculatePrice(stoneType, quantity = 1) {
     throw new Error("Fjöldi verður að vera jákvæð tala");
   }
   
+  // Handle specific Modena sizes if dimensions are provided
+  let specificStoneType = stoneType;
+  if (stoneType.toLowerCase() === 'modena' && dimensions) {
+    if (dimensions.length === 10 && dimensions.width === 10) {
+      specificStoneType = 'modena_10x10';
+    } else if (dimensions.length === 20 && dimensions.width === 10) {
+      specificStoneType = 'modena_20x10';
+    } else if (dimensions.length === 30 && dimensions.width === 30) {
+      specificStoneType = 'modena_30x30';
+    }
+    console.log(`Recognized specific Modena size: ${specificStoneType}`);
+  }
+  
   // Get price information for the stone type
-  const priceInfo = getStonePriceInfo(stoneType);
+  const priceInfo = getStonePriceInfo(specificStoneType);
   const unitPrice = priceInfo.pricePerUnit;
   const totalPrice = quantity * unitPrice;
   
-  console.log(`Price calculation for ${quantity} ${stoneType}:`, {
+  console.log(`Price calculation for ${quantity} ${specificStoneType}:`, {
     unitPrice,
     totalPrice,
     pricePerM2: priceInfo.pricePerM2
   });
   
   // Get stone dimensions for additional information
-  const stoneDimensions = getDefaultStoneDimensions(stoneType);
+  const stoneDimensions = dimensions || getDefaultStoneDimensions(specificStoneType);
+  
+  // Format specific size description if known
+  let sizeDescription = '';
+  if (dimensions) {
+    sizeDescription = ` í stærðinni ${dimensions.length}x${dimensions.width}${dimensions.thickness ? 'x'+dimensions.thickness : ''}`;
+  }
   
   return {
     calculationType: 'price',
@@ -108,7 +129,7 @@ export function calculatePrice(stoneType, quantity = 1) {
     totalPrice: totalPrice,
     pricePerM2: priceInfo.pricePerM2,
     currency: 'ISK',
-    explanation: `Verð fyrir ${quantity} stykki af ${stoneType} er ${totalPrice.toLocaleString('is-IS')} ISK (${unitPrice.toLocaleString('is-IS')} ISK per stykki).`
+    explanation: `Verð fyrir ${quantity} stykki af ${stoneType}${sizeDescription} er ${totalPrice.toLocaleString('is-IS')} ISK (${unitPrice.toLocaleString('is-IS')} ISK per stykki).`
   };
 }
 
@@ -290,6 +311,7 @@ export function calculateCompleteProject(length, width, stoneType, stoneThicknes
  */
 function getDefaultStoneDimensions(stoneType) {
   const dimensions = {
+    // Standard stone dimensions
     "hella": { length: 40, width: 40 },
     "arena": { length: 25, width: 25 },
     "borgarhella": { length: 50, width: 50 },
@@ -299,13 +321,38 @@ function getDefaultStoneDimensions(stoneType) {
     "rómarsteinn": { length: 16, width: 16 }, // Average size
     "veranda": { length: 60, width: 40 },
     "vínarsteinn": { length: 15, width: 15 }, // Approximate average size
-    "modena": { length: 10, width: 10 } // Added dimensions for Modena
+    
+    // Modena dimensions for all available sizes
+    "modena": { length: 10, width: 10 }, // Default to smallest size
+    "modena_10x10": { length: 10, width: 10 },
+    "modena_20x10": { length: 20, width: 10 },
+    "modena_30x30": { length: 30, width: 30 }
   };
   
   // Normalize the stone type name by removing non-alphanumeric characters
   const normalizedType = stoneType.toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, ""); // Remove diacritics (á,é,í,ó,ú,ý,þ,æ,ö)
+  
+  // Check if the input contains a specific Modena size pattern
+  if (normalizedType.startsWith('modena')) {
+    const sizePattern = /(\d+)x(\d+)/;
+    const match = normalizedType.match(sizePattern);
+    
+    if (match) {
+      const length = parseInt(match[1], 10);
+      const width = parseInt(match[2], 10);
+      
+      // Return the corresponding Modena size if available
+      if (length === 10 && width === 10) {
+        return dimensions.modena_10x10;
+      } else if (length === 20 && width === 10) {
+        return dimensions.modena_20x10;
+      } else if (length === 30 && width === 30) {
+        return dimensions.modena_30x30;
+      }
+    }
+  }
   
   // Return the dimensions if found, otherwise a default size
   return dimensions[normalizedType] || { length: 30, width: 30 };
@@ -397,6 +444,7 @@ function getStonePriceInfo(stoneType, stoneSize) {
   // For now, we'll use simplified logic based on a few common types
   
   const priceInfo = {
+    // Standard stone prices
     "hella": {
       pricePerUnit: 1122,
       pricePerM2: 7008
@@ -425,9 +473,23 @@ function getStonePriceInfo(stoneType, stoneSize) {
       pricePerUnit: 2808,
       pricePerM2: 11680
     },
-    "modena": {  // Added Modena pricing
-      pricePerUnit: 80,
+    
+    // Modena prices for all available sizes
+    "modena": {
+      pricePerUnit: 80, // Default to smallest size
       pricePerM2: 8009
+    },
+    "modena_10x10": {
+      pricePerUnit: 80,
+      pricePerM2: 8000  // 100 pieces per m²: 100 × 80 = 8,000 ISK/m²
+    },
+    "modena_20x10": {
+      pricePerUnit: 151,
+      pricePerM2: 7550  // 50 pieces per m²: 50 × 151 = 7,550 ISK/m²
+    },
+    "modena_30x30": {
+      pricePerUnit: 705,
+      pricePerM2: 7826  // 11.1 pieces per m²: 11.1 × 705 = 7,826 ISK/m²
     }
   };
   

@@ -192,16 +192,20 @@ export function detectCalculationIntent(query) {
             }
           }
           
-          console.log(`✅ Detected ${calculationType} calculation intent for ${quantity} ${productType}`);
+          // Extract any size specifications
+          const sizeSpec = extractSizeSpecification(query);
+          
+          console.log(`✅ Detected ${calculationType} calculation intent for ${quantity} ${productType}${sizeSpec ? ` size ${sizeSpec.length}x${sizeSpec.width}${sizeSpec.thickness ? 'x'+sizeSpec.thickness : ''}` : ''}`);
           
           return {
             calculationType,
             parameters: {
               quantity: quantity,
-              stoneType: productType
+              stoneType: productType,
+              dimensions: sizeSpec
             }
           };
-        }
+        }  
         
         // Extract dimensions if present
         const dimensions = extractDimensions(query);
@@ -263,11 +267,13 @@ export function processCalculation(calculationType, parameters) {
   // TODO: As you add price calculation functions to other calculator modules
   // (steypa, sandur, etc.), add corresponding cases here to handle those product types
   switch (calculationType) {
-    // Add this as the first case in the switch statement in processCalculation function:
+    // Price calculation for paving stones
     case 'priceCalculation':
+      // Extract any size specifications in the query
       return hellurCalculator.calculatePrice(
         parameters.stoneType || 'hella',
-        parameters.quantity || 1
+        parameters.quantity || 1,
+        parameters.dimensions  // Pass the dimensions from parameters
       );
 
     // Paving stone calculations
@@ -566,6 +572,34 @@ function extractStoneType(query) {
   }
   
   console.log(`⚠️ No specific stone type found`);
+  return null;
+}
+
+/**
+ * Extracts dimensions from a size specification string like "10x10x6"
+ * @param {string} query - User's query containing size specification
+ * @returns {Object|null} - Dimensions object or null if not found
+ */
+function extractSizeSpecification(query) {
+  // Look for patterns like "10x10x6", "10 x 10 x 6", "10x10", "stærð 10x10", etc.
+  const sizePattern = /(\d+)\s*x\s*(\d+)(?:\s*x\s*(\d+))?/i;
+  const match = query.match(sizePattern);
+  
+  if (match) {
+    const dimensions = {
+      length: parseInt(match[1], 10),
+      width: parseInt(match[2], 10)
+    };
+    
+    // Include thickness if present
+    if (match[3]) {
+      dimensions.thickness = parseInt(match[3], 10);
+    }
+    
+    console.log(`📏 Extracted size specification:`, dimensions);
+    return dimensions;
+  }
+  
   return null;
 }
 

@@ -154,6 +154,9 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     const startTime = Date.now();
     const { message, sessionId } = req.body;
     
+    // Initialize processing steps array for real-time tracking
+    const processingSteps = [];
+    
     // Log the incoming request details
     console.log(`📝 Processing request:`, {
       sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'undefined',
@@ -161,9 +164,15 @@ app.post('/chat', verifyApiKey, async (req, res) => {
       timestamp: new Date().toISOString()
     });
     
+    // Add initial processing step
+    processingSteps.push("🔄 Hefst vinnsla fyrirspurnar...");
+    
     // Get or create session context with enhanced structure
     const sessionContext = getSessionContext(sessionId);
     console.log(`🧠 Session context ${sessions.has(sessionId) ? 'retrieved' : 'created'} for ${sessionId.substring(0, 8)}...`);
+    
+    // Add context retrieval step
+    processingSteps.push("🧠 Sæki samtalssögu og samhengi...");
     
     // Add user message to context
     updateContext(sessionContext, { role: 'user', content: message });
@@ -176,6 +185,7 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     if (newTopics.length > 0) {
       console.log(`🧠 New topics detected: ${newTopics.join(', ')}`);
+      processingSteps.push(`🔍 Greini umræðuefni: ${newTopics.join(', ')}`);
     } else {
       console.log(`🧠 No new topics detected. Current topics: ${sessionContext.topics.join(', ') || 'none'}`);
     }
@@ -188,6 +198,7 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     if (prevGoal !== sessionContext.userIntent.mainGoal) {
       console.log(`🧠 Project intent detected: ${sessionContext.userIntent.mainGoal}`);
+      processingSteps.push(`🏗️ Greini verkefnisgerð: ${getIcelandicIntentName(sessionContext.userIntent.mainGoal)}`);
     }
     
     const currentDetailsCount = Object.keys(sessionContext.userIntent.projectDetails).length;
@@ -195,13 +206,33 @@ app.post('/chat', verifyApiKey, async (req, res) => {
       console.log(`🧠 New project details detected:`, 
         JSON.stringify(sessionContext.userIntent.projectDetails)
       );
+      
+      // Add project details step
+      if (sessionContext.userIntent.projectDetails.dimensions) {
+        const { length, width } = sessionContext.userIntent.projectDetails.dimensions;
+        processingSteps.push(`📐 Staðfesti stærð: ${length}m x ${width}m`);
+      }
+      
+      if (sessionContext.userIntent.projectDetails.thickness) {
+        processingSteps.push(`📏 Staðfesti þykkt: ${sessionContext.userIntent.projectDetails.thickness}cm`);
+      }
     }
     
     // Check cache for identical request
     const cacheKey = `${sessionId}-${message}`;
     if (responseCache.has(cacheKey)) {
       console.log('💾 Using cached response');
-      return res.json(responseCache.get(cacheKey));
+      processingSteps.push("💾 Sæki fyrirliggjandi svar úr skyndiminni...");
+      
+      // Add a small delay to show the processing steps even with cached response
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Return cached response with processing steps
+      const cachedResponse = responseCache.get(cacheKey);
+      return res.json({
+        ...cachedResponse,
+        processingSteps
+      });
     }
     
     console.log(`📋 Processing new request for session ${sessionId.substring(0, 8)}...`);
@@ -210,14 +241,22 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     // Get relevant knowledge from the knowledge base
     console.log('🔍 Retrieving relevant knowledge...');
+    processingSteps.push("📚 Leita að viðeigandi upplýsingum í gagnagrunni...");
+    
     const relevantKnowledge = await getRelevantKnowledge(message);
     console.log(`🔍 Found ${relevantKnowledge.length} relevant knowledge items`);
+    
     if (relevantKnowledge.length > 0) {
       console.log(`🔍 Top match (${Math.round(relevantKnowledge[0].similarity * 100)}%): ${relevantKnowledge[0].text.substring(0, 100)}...`);
+      processingSteps.push(`📑 Finn viðeigandi upplýsingar (${relevantKnowledge.length} niðurstöður)`);
+    } else {
+      processingSteps.push("🔍 Leita að fleiri upplýsingum...");
     }
     
     // Check for calculation intent
     console.log('🧮 Checking for calculation intent...');
+    processingSteps.push("🧮 Athuga hvort þörf sé á útreikningum...");
+    
     const calculationIntent = detectCalculationIntent(message);
     let calculationResult = null;
     
@@ -225,6 +264,9 @@ app.post('/chat', verifyApiKey, async (req, res) => {
       try {
         console.log(`🧮 Detected calculation intent: ${calculationIntent.calculationType}`);
         console.log(`🧮 Calculation parameters:`, calculationIntent.parameters);
+        
+        // Add calculation intent step with Icelandic description
+        processingSteps.push(`🔢 Framkvæmi útreikninga: ${getIcelandicCalculationType(calculationIntent.calculationType)}`);
         
         calculationResult = processCalculation(
           calculationIntent.calculationType, 
@@ -240,8 +282,12 @@ app.post('/chat', verifyApiKey, async (req, res) => {
         
         console.log('🧮 Calculation completed successfully');
         console.log('🧮 Result summary:', JSON.stringify(calculationResult).substring(0, 200) + '...');
+        
+        // Add calculation result step
+        processingSteps.push("✅ Útreikningar kláraðir");
       } catch (error) {
         console.error('🚨 Error in calculation:', error);
+        processingSteps.push("⚠️ Villa kom upp í útreikningum");
         // Continue without calculation results
       }
     } else {
@@ -254,6 +300,8 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     // Generate response using OpenAI
     console.log('🤖 Generating AI response...');
+    processingSteps.push("🤖 Bý til svar með gervigreind...");
+    
     const aiStartTime = Date.now();
     
     const aiResponse = await generateAIResponse(message, sessionContext, relevantKnowledge, calculationResult, contextualInstruction);
@@ -262,6 +310,8 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     console.log(`🕒 AI response generated in ${aiEndTime - aiStartTime}ms`);
     console.log(`🤖 Response preview: ${aiResponse.content.substring(0, 100)}...`);
     
+    processingSteps.push("📝 Frumstilli svar...");
+    
     // Update context with AI response
     updateContext(sessionContext, { role: 'assistant', content: aiResponse.content });
     console.log(`🧠 AI response added to context, total messages: ${sessionContext.messages.length}`);
@@ -269,14 +319,19 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     // Periodically update conversation summary after every 5 messages
     if (sessionContext.messages.length % 5 === 0) {
       console.log(`🧠 Generating conversation summary...`);
+      processingSteps.push("📋 Uppfæri samantekt á samtali...");
       await updateConversationSummary(sessionContext);
       console.log(`🧠 Conversation summary updated: ${sessionContext.conversationSummary.substring(0, 100)}...`);
     }
     
+    // Final processing step
+    processingSteps.push("✓ Svar tilbúið");
+    
     // Save to cache
     const responseObject = {
       message: aiResponse.content,
-      calculationResult: calculationResult
+      calculationResult: calculationResult,
+      processingSteps: processingSteps
     };
     responseCache.set(cacheKey, responseObject);
     console.log(`💾 Response cached with key: ${cacheKey.substring(0, 20)}...`);
@@ -300,7 +355,8 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     return res.status(500).json({ 
       message: "Því miður kom upp villa. Vinsamlegast reyndu aftur síðar.",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      processingSteps: ["🚨 Villa kom upp við vinnslu beiðni"]
     });
   }
 });
@@ -557,6 +613,40 @@ function detectProjectIntent(userMessage, sessionContext) {
     sessionContext.userIntent.projectDetails.thickness = parseInt(thicknessMatch[1], 10);
     console.log(`🧠 Extracted thickness: ${thicknessMatch[1]} cm`);
   }
+}
+
+/**
+ * Get Icelandic name for project intent
+ * @param {string} intent - Intent code
+ * @returns {string} - Icelandic intent name
+ */
+function getIcelandicIntentName(intent) {
+  const intentNames = {
+    building_patio: 'Hellulögn/Verönd',
+    concrete_project: 'Steypuvinna',
+    remodeling: 'Endurgerð',
+    waste_management: 'Sorptunnuskýli'
+  };
+  
+  return intentNames[intent] || intent;
+}
+
+/**
+ * Get Icelandic name for calculation type
+ * @param {string} calculationType - Calculation type code
+ * @returns {string} - Icelandic calculation type name
+ */
+function getIcelandicCalculationType(calculationType) {
+  const calculationNames = {
+    paving_area: 'Flatarmál hellna',
+    concrete_volume: 'Rúmmál steypu',
+    material_cost: 'Efniskostnaður',
+    concrete_floor: 'Steypugólf',
+    wall_cladding: 'Útveggjaklæðning',
+    soil_volume: 'Jarðvegsmagn'
+  };
+  
+  return calculationNames[calculationType] || calculationType;
 }
 
 /**

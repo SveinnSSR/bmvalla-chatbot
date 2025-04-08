@@ -852,9 +852,13 @@ export const knowledgeBase = {
               sku: "25-610-Grátt",
               description: "Modena-hellurnar eru kunnugleg sjón um allt land, enda þrautreynt og hagkvæmt efni á verandir, sólpalla, stíga og gangstéttir. Hellurnar eru 6 cm þykkar og fást í þremur mismunandi stærðum og með fjarlægðarrákum sem auðvelda lögn og auka stöðugleika lagnarinnar. Hægt er að velja úr fjölbreyttu úrvali jafnþykkra steina í öðrum litum til að brjóta upp form og fleti lagnarinnar.",
               shortDescription: "Modena-hellurnar eru kunnugleg sjón um allt land, enda þrautreynt og hagkvæmt efni á verandir, sólpalla, stíga og gangstéttir.",
-              price: { amount: 80, unit: "stk", pricePerM2: 8009 },
+              sizeOptions: [
+                { size: "10x10x6 cm", price: { amount: 80, unit: "stk" }, coverage: "100 stk/m²" },
+                { size: "20x10x6 cm", price: { amount: 151, unit: "stk" }, coverage: "50 stk/m²" },
+                { size: "30x30x6 cm", price: { amount: 705, unit: "stk" }, coverage: "11.1 stk/m²" }
+              ],
               weight: "1.50 kg",
-              sizes: ["10x10x6 cm"],
+              sizes: ["10x10x6 cm", "20x10x6 cm", "30x30x6 cm"],
               colors: ["Grár"],
               environmentalDeclaration: true,
               path: "Verslun/Hellur/Bílastæði/Modena",
