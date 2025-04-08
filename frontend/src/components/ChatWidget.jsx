@@ -448,7 +448,7 @@ const ChatWidget = ({
         style={{
           padding: '12px 16px',
           borderRadius: '16px',
-          backgroundColor: '#f0f0f0',
+          backgroundColor: '#e0e0e0',
           display: 'flex',
           alignItems: 'center',
           gap: '4px',
