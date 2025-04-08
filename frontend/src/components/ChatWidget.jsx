@@ -266,64 +266,79 @@ const ChatWidget = ({
 
   // Typing indicator component
   const TypingIndicator = () => (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'flex-start',
-      marginBottom: '16px',
-      alignItems: 'flex-start',
-      gap: '8px'
-    }}>
-      <div style={{
-        width: '30px',
-        height: '30px',
-        borderRadius: '50%',
-        marginTop: '4px',
-        backgroundColor: theme.colors.primary,
+    <div
+      style={{
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: '12px',
-      }}>
-        BV
+        justifyContent: 'flex-start',
+        marginBottom: '16px',
+        alignItems: 'flex-start',
+        gap: '8px',
+      }}
+    >
+      <div
+        style={{
+          width: '30px',
+          height: '30px',
+          borderRadius: '50%',
+          marginTop: '4px',
+          overflow: 'hidden',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <img
+          src="/logo.png"
+          alt="BM Vallá"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+        />
       </div>
-      <div style={{
-        padding: '12px 16px',
-        borderRadius: '16px',
-        backgroundColor: '#f0f0f0',
-        display: 'flex',
-        gap: '4px',
-        alignItems: 'center',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-        border: '1px solid rgba(0, 0, 0, 0.05)'
-      }}>
-        <span style={{
-          height: '8px',
-          width: '8px',
-          backgroundColor: '#93918f',
-          borderRadius: '50%',
-          opacity: 0.4,
-          animation: 'bm-valla-chat-typing 1s infinite'
-        }}/>
-        <span style={{
-          height: '8px',
-          width: '8px',
-          backgroundColor: '#93918f',
-          borderRadius: '50%',
-          opacity: 0.4,
-          animation: 'bm-valla-chat-typing 1s infinite',
-          animationDelay: '0.2s'
-        }}/>
-        <span style={{
-          height: '8px',
-          width: '8px',
-          backgroundColor: '#93918f',
-          borderRadius: '50%',
-          opacity: 0.4,
-          animation: 'bm-valla-chat-typing 1s infinite',
-          animationDelay: '0.4s'
-        }}/>
+      <div
+        style={{
+          padding: '12px 16px',
+          borderRadius: '16px',
+          backgroundColor: '#f0f0f0',
+          display: 'flex',
+          gap: '4px',
+          alignItems: 'center',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(0, 0, 0, 0.05)',
+        }}
+      >
+        <span
+          style={{
+            height: '8px',
+            width: '8px',
+            backgroundColor: '#93918f',
+            borderRadius: '50%',
+            opacity: 0.4,
+            animation: 'bm-valla-chat-typing 1s infinite',
+          }}
+        />
+        <span
+          style={{
+            height: '8px',
+            width: '8px',
+            backgroundColor: '#93918f',
+            borderRadius: '50%',
+            opacity: 0.4,
+            animation: 'bm-valla-chat-typing 1s infinite',
+            animationDelay: '0.2s',
+          }}
+        />
+        <span
+          style={{
+            height: '8px',
+            width: '8px',
+            backgroundColor: '#93918f',
+            borderRadius: '50%',
+            opacity: 0.4,
+            animation: 'bm-valla-chat-typing 1s infinite',
+            animationDelay: '0.4s',
+          }}
+        />
       </div>
     </div>
   );
