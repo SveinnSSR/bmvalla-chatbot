@@ -1143,7 +1143,7 @@ async function processSSERequest(req, res, message, sessionId) {
     
     // Generate response using OpenAI
     console.log('🤖 Generating AI response...');
-    sendEvent({ type: 'processingStep', step: "🤖 Bý til svar með gervigreind..." });
+    sendEvent({ type: 'processingStep', step: "💭 Hugsa málið..." });
     
     const aiStartTime = Date.now();
     const aiResponse = await generateAIResponse(message, sessionContext, relevantKnowledge, calculationResult, contextualInstruction);
