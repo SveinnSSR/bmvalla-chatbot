@@ -3569,7 +3569,9 @@ export const knowledgeBase = {
 export async function getRelevantKnowledge(query) {
   try {
     // Search for similar content using vector similarity
-    const results = await searchSimilarContent(query, 5, 0.6); // Changed from 0.7 to 0.6
+    // First parameter (5) is the number of results to return
+    // Second parameter (0.5) is the similarity threshold - lowered from 0.6
+    const results = await searchSimilarContent(query, 5, 0.5);
     
     // Format the results for use in the chatbot
     return results.map(result => ({

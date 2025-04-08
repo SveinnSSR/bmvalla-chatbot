@@ -22,6 +22,8 @@ export function detectCalculationIntent(query) {
     .replace(/\s+/g, " "); // Normalize whitespace
 
   // Patterns for different calculation types
+  // TODO: As we expand pricing functionality to other product categories (steypa, sandur, etc.),
+  // add specific price calculation patterns for each product type here, following the same approach as priceCalculation
   const patterns = {
     // Paving stone patterns
     pavingStones: [
@@ -53,6 +55,16 @@ export function detectCalculationIntent(query) {
       /hvað þarf ég (?:mikið|margt|allt)/i,
       /efnisþörf (?:fyrir|í) hellulögn/i
     ],
+
+    // Price calculation patterns
+    // Price calculation patterns for hellur products
+    priceCalculation: [
+      /(?:hvað|hve) (?:kostar|kosta) (\d+) (?:stykki af |stk af |stk\. af |)?([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
+      /verð(?:ið)? fyrir (\d+) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
+      /(?:hvað|hve) (?:kosta(?:r)?) (\d+) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
+      /(\d+) stykki af ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
+      /(\d+) (?:stk\.|stk|stykki) ([a-zðþæöáéíóúý\s]+)(?:hellur|hellum|)/i,
+    ],    
     
     // Concrete calculation patterns
     concreteVolume: [
@@ -162,6 +174,35 @@ export function detectCalculationIntent(query) {
   for (const [calculationType, patternList] of Object.entries(patterns)) {
     for (const pattern of patternList) {
       if (pattern.test(normalizedQuery)) {
+        // Special handling for price calculation patterns
+        if (calculationType === 'priceCalculation') {
+          const match = normalizedQuery.match(pattern);
+          
+          // Extract quantity and product type from the pattern match
+          let quantity = 1;
+          let productType = '';
+          
+          if (match && match.length >= 3) {
+            quantity = parseInt(match[1], 10);
+            productType = match[2].trim();
+            
+            // Special case for Modena which is often mentioned specifically
+            if (productType.includes('modena')) {
+              productType = 'modena';
+            }
+          }
+          
+          console.log(`✅ Detected ${calculationType} calculation intent for ${quantity} ${productType}`);
+          
+          return {
+            calculationType,
+            parameters: {
+              quantity: quantity,
+              stoneType: productType
+            }
+          };
+        }
+        
         // Extract dimensions if present
         const dimensions = extractDimensions(query);
         
@@ -219,7 +260,16 @@ export function detectCalculationIntent(query) {
 export function processCalculation(calculationType, parameters) {
   console.log(`🧮 Processing ${calculationType} calculation with parameters:`, parameters);
   
+  // TODO: As you add price calculation functions to other calculator modules
+  // (steypa, sandur, etc.), add corresponding cases here to handle those product types
   switch (calculationType) {
+    // Add this as the first case in the switch statement in processCalculation function:
+    case 'priceCalculation':
+      return hellurCalculator.calculatePrice(
+        parameters.stoneType || 'hella',
+        parameters.quantity || 1
+      );
+
     // Paving stone calculations
     case 'pavingStones':
       const result = hellurCalculator.calculatePavingStones(

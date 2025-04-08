@@ -68,6 +68,51 @@ export function calculatePavingStones(length, width, stoneType, stoneSize = null
 }
 
 /**
+ * Calculates the price for a specific quantity of paving stones
+ * Provides a simple price calculation without area measurements
+ * @param {string} stoneType - Type of stone (e.g., "hella", "modena")
+ * @param {number} quantity - Number of stones requested
+ * @returns {Object} - Calculation result with pricing details
+ */
+export function calculatePrice(stoneType, quantity = 1) {
+  console.log(`calculatePrice called with:`, {
+    stoneType,
+    quantity
+  });
+  
+  // Input validation
+  if (quantity <= 0) {
+    throw new Error("Fjöldi verður að vera jákvæð tala");
+  }
+  
+  // Get price information for the stone type
+  const priceInfo = getStonePriceInfo(stoneType);
+  const unitPrice = priceInfo.pricePerUnit;
+  const totalPrice = quantity * unitPrice;
+  
+  console.log(`Price calculation for ${quantity} ${stoneType}:`, {
+    unitPrice,
+    totalPrice,
+    pricePerM2: priceInfo.pricePerM2
+  });
+  
+  // Get stone dimensions for additional information
+  const stoneDimensions = getDefaultStoneDimensions(stoneType);
+  
+  return {
+    calculationType: 'price',
+    productType: stoneType,
+    stoneDimensions,
+    quantity: quantity,
+    unitPrice: unitPrice,
+    totalPrice: totalPrice,
+    pricePerM2: priceInfo.pricePerM2,
+    currency: 'ISK',
+    explanation: `Verð fyrir ${quantity} stykki af ${stoneType} er ${totalPrice.toLocaleString('is-IS')} ISK (${unitPrice.toLocaleString('is-IS')} ISK per stykki).`
+  };
+}
+
+/**
  * Recommends appropriate stone thickness based on usage
  * @param {string} usage - Intended usage ("gangstétt", "innkeyrsla", "bílastæði", "þungaumferð")
  * @returns {Object} - Recommendation with explanation
@@ -253,7 +298,8 @@ function getDefaultStoneDimensions(stoneType) {
     "jötunsteinn": { length: 30, width: 30 },
     "rómarsteinn": { length: 16, width: 16 }, // Average size
     "veranda": { length: 60, width: 40 },
-    "vínarsteinn": { length: 15, width: 15 } // Approximate average size
+    "vínarsteinn": { length: 15, width: 15 }, // Approximate average size
+    "modena": { length: 10, width: 10 } // Added dimensions for Modena
   };
   
   // Normalize the stone type name by removing non-alphanumeric characters
@@ -378,6 +424,10 @@ function getStonePriceInfo(stoneType, stoneSize) {
     "veranda": {
       pricePerUnit: 2808,
       pricePerM2: 11680
+    },
+    "modena": {  // Added Modena pricing
+      pricePerUnit: 80,
+      pricePerM2: 8009
     }
   };
   
