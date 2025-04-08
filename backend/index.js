@@ -49,6 +49,39 @@ pool.query('SELECT NOW()', (err, res) => {
   }
 });
 
+// Add this helper function to send SSE events
+function setupSSE(req, res) {
+  // Set up SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no' // Disable buffering for Nginx if you use it
+  });
+  
+  // Send initial connection established event
+  res.write(`data: ${JSON.stringify({type: 'connected'})}\n\n`);
+  
+  // Helper function to send events
+  const sendEvent = (data) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+  
+  // Keep the connection alive with a ping every 30 seconds
+  const keepAliveInterval = setInterval(() => {
+    sendEvent({ type: 'ping', timestamp: Date.now() });
+  }, 30000);
+  
+  // Clean up on close
+  req.on('close', () => {
+    clearInterval(keepAliveInterval);
+    res.end();
+    console.log('SSE connection closed');
+  });
+  
+  return sendEvent;
+}
+
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -152,10 +185,30 @@ app.get('/test', (req, res) => {
 app.post('/chat', verifyApiKey, async (req, res) => {
   try {
     const startTime = Date.now();
-    const { message, sessionId } = req.body;
+    const { message, sessionId, useSSE } = req.body;
     
-    // Initialize processing steps array for real-time tracking
+    // Set up SSE if requested
+    const isSSE = useSSE === true;
+    let sendEvent;
+    
+    if (isSSE) {
+      sendEvent = setupSSE(req, res);
+    }
+    
+    // Initialize processing steps array for tracking
     const processingSteps = [];
+    const addStep = (step) => {
+      processingSteps.push(step);
+      
+      // If using SSE, send the step immediately
+      if (isSSE && sendEvent) {
+        sendEvent({ 
+          type: 'processingStep', 
+          step: step,
+          timestamp: Date.now() 
+        });
+      }
+    };
     
     // Log the incoming request details
     console.log(`📝 Processing request:`, {
@@ -165,14 +218,14 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     });
     
     // Add initial processing step
-    processingSteps.push("🔄 Hefst vinnsla fyrirspurnar...");
+    addStep("🔄 Hefst vinnsla fyrirspurnar...");
     
     // Get or create session context with enhanced structure
     const sessionContext = getSessionContext(sessionId);
     console.log(`🧠 Session context ${sessions.has(sessionId) ? 'retrieved' : 'created'} for ${sessionId.substring(0, 8)}...`);
     
     // Add context retrieval step
-    processingSteps.push("🧠 Sæki samtalssögu og samhengi...");
+    addStep("🧠 Sæki samtalssögu og samhengi...");
     
     // Add user message to context
     updateContext(sessionContext, { role: 'user', content: message });
@@ -185,7 +238,7 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     if (newTopics.length > 0) {
       console.log(`🧠 New topics detected: ${newTopics.join(', ')}`);
-      processingSteps.push(`🔍 Greini umræðuefni: ${newTopics.join(', ')}`);
+      addStep(`🔍 Greini umræðuefni: ${newTopics.join(', ')}`);
     } else {
       console.log(`🧠 No new topics detected. Current topics: ${sessionContext.topics.join(', ') || 'none'}`);
     }
@@ -198,7 +251,7 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     if (prevGoal !== sessionContext.userIntent.mainGoal) {
       console.log(`🧠 Project intent detected: ${sessionContext.userIntent.mainGoal}`);
-      processingSteps.push(`🏗️ Greini verkefnisgerð: ${getIcelandicIntentName(sessionContext.userIntent.mainGoal)}`);
+      addStep(`🏗️ Greini verkefnisgerð: ${getIcelandicIntentName(sessionContext.userIntent.mainGoal)}`);
     }
     
     const currentDetailsCount = Object.keys(sessionContext.userIntent.projectDetails).length;
@@ -210,11 +263,11 @@ app.post('/chat', verifyApiKey, async (req, res) => {
       // Add project details step
       if (sessionContext.userIntent.projectDetails.dimensions) {
         const { length, width } = sessionContext.userIntent.projectDetails.dimensions;
-        processingSteps.push(`📐 Staðfesti stærð: ${length}m x ${width}m`);
+        addStep(`📐 Staðfesti stærð: ${length}m x ${width}m`);
       }
       
       if (sessionContext.userIntent.projectDetails.thickness) {
-        processingSteps.push(`📏 Staðfesti þykkt: ${sessionContext.userIntent.projectDetails.thickness}cm`);
+        addStep(`📏 Staðfesti þykkt: ${sessionContext.userIntent.projectDetails.thickness}cm`);
       }
     }
     
@@ -222,13 +275,25 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     const cacheKey = `${sessionId}-${message}`;
     if (responseCache.has(cacheKey)) {
       console.log('💾 Using cached response');
-      processingSteps.push("💾 Sæki fyrirliggjandi svar úr skyndiminni...");
+      addStep("💾 Sæki fyrirliggjandi svar úr skyndiminni...");
       
       // Add a small delay to show the processing steps even with cached response
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Return cached response with processing steps
       const cachedResponse = responseCache.get(cacheKey);
+      
+      // If using SSE, send completion event and end
+      if (isSSE) {
+        sendEvent({ 
+          type: 'complete', 
+          message: cachedResponse.message,
+          calculationResult: cachedResponse.calculationResult,
+          processingSteps: processingSteps
+        });
+        return; // Connection stays open but function exits
+      }
+      
+      // Return cached response with processing steps for regular HTTP
       return res.json({
         ...cachedResponse,
         processingSteps
@@ -241,21 +306,21 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     // Get relevant knowledge from the knowledge base
     console.log('🔍 Retrieving relevant knowledge...');
-    processingSteps.push("📚 Leita að viðeigandi upplýsingum í gagnagrunni...");
+    addStep("📚 Leita að viðeigandi upplýsingum í gagnagrunni...");
     
     const relevantKnowledge = await getRelevantKnowledge(message);
     console.log(`🔍 Found ${relevantKnowledge.length} relevant knowledge items`);
     
     if (relevantKnowledge.length > 0) {
       console.log(`🔍 Top match (${Math.round(relevantKnowledge[0].similarity * 100)}%): ${relevantKnowledge[0].text.substring(0, 100)}...`);
-      processingSteps.push(`📑 Finn viðeigandi upplýsingar (${relevantKnowledge.length} niðurstöður)`);
+      addStep(`📑 Finn viðeigandi upplýsingar (${relevantKnowledge.length} niðurstöður)`);
     } else {
-      processingSteps.push("🔍 Leita að fleiri upplýsingum...");
+      addStep("🔍 Leita að fleiri upplýsingum...");
     }
     
     // Check for calculation intent
     console.log('🧮 Checking for calculation intent...');
-    processingSteps.push("🧮 Athuga hvort þörf sé á útreikningum...");
+    addStep("🧮 Athuga hvort þörf sé á útreikningum...");
     
     const calculationIntent = detectCalculationIntent(message);
     let calculationResult = null;
@@ -266,7 +331,7 @@ app.post('/chat', verifyApiKey, async (req, res) => {
         console.log(`🧮 Calculation parameters:`, calculationIntent.parameters);
         
         // Add calculation intent step with Icelandic description
-        processingSteps.push(`🔢 Framkvæmi útreikninga: ${getIcelandicCalculationType(calculationIntent.calculationType)}`);
+        addStep(`🔢 Framkvæmi útreikninga: ${getIcelandicCalculationType(calculationIntent.calculationType)}`);
         
         calculationResult = processCalculation(
           calculationIntent.calculationType, 
@@ -284,10 +349,10 @@ app.post('/chat', verifyApiKey, async (req, res) => {
         console.log('🧮 Result summary:', JSON.stringify(calculationResult).substring(0, 200) + '...');
         
         // Add calculation result step
-        processingSteps.push("✅ Útreikningar kláraðir");
+        addStep("✅ Útreikningar kláraðir");
       } catch (error) {
         console.error('🚨 Error in calculation:', error);
-        processingSteps.push("⚠️ Villa kom upp í útreikningum");
+        addStep("⚠️ Villa kom upp í útreikningum");
         // Continue without calculation results
       }
     } else {
@@ -300,7 +365,7 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     
     // Generate response using OpenAI
     console.log('🤖 Generating AI response...');
-    processingSteps.push("🤖 Bý til svar með gervigreind...");
+    addStep("🤖 Bý til svar með gervigreind...");
     
     const aiStartTime = Date.now();
     
@@ -310,7 +375,7 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     console.log(`🕒 AI response generated in ${aiEndTime - aiStartTime}ms`);
     console.log(`🤖 Response preview: ${aiResponse.content.substring(0, 100)}...`);
     
-    processingSteps.push("📝 Frumstilli svar...");
+    addStep("📝 Frumstilli svar...");
     
     // Update context with AI response
     updateContext(sessionContext, { role: 'assistant', content: aiResponse.content });
@@ -319,13 +384,13 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     // Periodically update conversation summary after every 5 messages
     if (sessionContext.messages.length % 5 === 0) {
       console.log(`🧠 Generating conversation summary...`);
-      processingSteps.push("📋 Uppfæri samantekt á samtali...");
+      addStep("📋 Uppfæri samantekt á samtali...");
       await updateConversationSummary(sessionContext);
       console.log(`🧠 Conversation summary updated: ${sessionContext.conversationSummary.substring(0, 100)}...`);
     }
     
     // Final processing step
-    processingSteps.push("✓ Svar tilbúið");
+    addStep("✓ Svar tilbúið");
     
     // Save to cache
     const responseObject = {
@@ -346,18 +411,92 @@ app.post('/chat', verifyApiKey, async (req, res) => {
     const endTime = Date.now();
     console.log(`✅ Response generated successfully in ${endTime - startTime}ms`);
     
-    // Return response
+    // For SSE, send complete event
+    if (isSSE) {
+      sendEvent({ 
+        type: 'complete', 
+        message: aiResponse.content,
+        calculationResult: calculationResult,
+        processingSteps: processingSteps
+      });
+      return; // Connection stays open but function exits
+    }
+    
+    // For regular HTTP, return response
     return res.json(responseObject);
     
   } catch (error) {
     console.error('🚨 Error handling chat request:', error);
     console.error('🚨 Stack trace:', error.stack);
     
+    // For SSE, send error event
+    if (req.body.useSSE) {
+      const sendEvent = req.sendEvent; // Access the sendEvent function we attached
+      if (sendEvent) {
+        sendEvent({ 
+          type: 'error', 
+          message: "Því miður kom upp villa. Vinsamlegast reyndu aftur síðar.",
+          error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+      }
+      return;
+    }
+    
+    // For regular HTTP, return error response
     return res.status(500).json({ 
       message: "Því miður kom upp villa. Vinsamlegast reyndu aftur síðar.",
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
       processingSteps: ["🚨 Villa kom upp við vinnslu beiðni"]
     });
+  }
+});
+
+// Add this new endpoint for SSE connection
+app.get('/chat-sse', (req, res) => {
+  try {
+    const apiKey = req.query.apiKey; // Get API key from query params
+    const sessionId = req.query.sessionId;
+    const message = req.query.message;
+    
+    // Verify API key
+    if (!apiKey || apiKey !== process.env.API_KEY) {
+      res.status(401).json({ error: "Unauthorized request" });
+      return;
+    }
+    
+    if (!sessionId || !message) {
+      res.status(400).json({ error: "Missing required parameters" });
+      return;
+    }
+    
+    // Set headers for SSE
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no' // Disable buffering for Nginx if you use it
+    });
+    
+    // Initial connection event
+    res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+    
+    // Process the request, sending events as processing happens
+    processSSERequest(req, res, message, sessionId);
+    
+  } catch (error) {
+    console.error('Error setting up SSE:', error);
+    
+    // Try to send error if we can
+    try {
+      res.write(`data: ${JSON.stringify({ 
+        type: 'error', 
+        message: "Villa kom upp við tengingu við þjón." 
+      })}\n\n`);
+      res.end();
+    } catch {
+      // If that fails too, just end the response
+      res.end();
+    }
   }
 });
 
@@ -827,5 +966,238 @@ MIKILVÆGT:
   } catch (error) {
     console.error('🚨 Error generating AI response:', error);
     throw error;
+  }
+}
+
+// This is the main function to process SSE requests
+async function processSSERequest(req, res, message, sessionId) {
+  // Helper function to send SSE events
+  function sendEvent(data) {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  }
+  
+  // Setup keep-alive interval
+  const keepAliveInterval = setInterval(() => {
+    sendEvent({ type: 'ping', timestamp: Date.now() });
+  }, 30000);
+  
+  // Handle client disconnect
+  req.on('close', () => {
+    clearInterval(keepAliveInterval);
+    console.log(`SSE connection closed for session ${sessionId.substring(0, 8)}...`);
+  });
+  
+  try {
+    const startTime = Date.now();
+    
+    // Log the incoming request details
+    console.log(`📝 Processing SSE request:`, {
+      sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'undefined',
+      messageLength: message ? message.length : 0,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Send initial processing step
+    sendEvent({ type: 'processingStep', step: "🔄 Hefst vinnsla fyrirspurnar..." });
+    
+    // Get or create session context
+    const sessionContext = getSessionContext(sessionId);
+    console.log(`🧠 Session context ${sessions.has(sessionId) ? 'retrieved' : 'created'} for ${sessionId.substring(0, 8)}...`);
+    
+    // Send context retrieval step
+    sendEvent({ type: 'processingStep', step: "🧠 Sæki samtalssögu og samhengi..." });
+    
+    // Add user message to context
+    updateContext(sessionContext, { role: 'user', content: message });
+    console.log(`🧠 User message added to context, total messages: ${sessionContext.messages.length}`);
+    
+    // Update topic tracking
+    const oldTopics = [...sessionContext.topics];
+    updateConversationTopics(sessionContext, message);
+    const newTopics = sessionContext.topics.filter(t => !oldTopics.includes(t));
+    
+    if (newTopics.length > 0) {
+      console.log(`🧠 New topics detected: ${newTopics.join(', ')}`);
+      sendEvent({ type: 'processingStep', step: `🔍 Greini umræðuefni: ${newTopics.join(', ')}` });
+    }
+    
+    // Detect project intent
+    const prevGoal = sessionContext.userIntent.mainGoal;
+    const prevDetailsCount = Object.keys(sessionContext.userIntent.projectDetails).length;
+    
+    detectProjectIntent(message, sessionContext);
+    
+    if (prevGoal !== sessionContext.userIntent.mainGoal) {
+      console.log(`🧠 Project intent detected: ${sessionContext.userIntent.mainGoal}`);
+      sendEvent({ 
+        type: 'processingStep', 
+        step: `🏗️ Greini verkefnisgerð: ${getIcelandicIntentName(sessionContext.userIntent.mainGoal)}` 
+      });
+    }
+    
+    const currentDetailsCount = Object.keys(sessionContext.userIntent.projectDetails).length;
+    if (currentDetailsCount > prevDetailsCount) {
+      console.log(`🧠 New project details detected:`, 
+        JSON.stringify(sessionContext.userIntent.projectDetails)
+      );
+      
+      // Add project details step
+      if (sessionContext.userIntent.projectDetails.dimensions) {
+        const { length, width } = sessionContext.userIntent.projectDetails.dimensions;
+        sendEvent({ 
+          type: 'processingStep', 
+          step: `📐 Staðfesti stærð: ${length}m x ${width}m` 
+        });
+      }
+      
+      if (sessionContext.userIntent.projectDetails.thickness) {
+        sendEvent({ 
+          type: 'processingStep', 
+          step: `📏 Staðfesti þykkt: ${sessionContext.userIntent.projectDetails.thickness}cm` 
+        });
+      }
+    }
+    
+    // Check cache for identical request
+    const cacheKey = `${sessionId}-${message}`;
+    if (responseCache.has(cacheKey)) {
+      console.log('💾 Using cached response');
+      sendEvent({ type: 'processingStep', step: "💾 Sæki fyrirliggjandi svar úr skyndiminni..." });
+      
+      // Add a small delay to show the step
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const cachedResponse = responseCache.get(cacheKey);
+      
+      // Send complete event
+      sendEvent({ 
+        type: 'complete', 
+        message: cachedResponse.message,
+        calculationResult: cachedResponse.calculationResult
+      });
+      
+      return;
+    }
+    
+    // Get relevant knowledge from the knowledge base
+    console.log('🔍 Retrieving relevant knowledge...');
+    sendEvent({ type: 'processingStep', step: "📚 Leita að viðeigandi upplýsingum í gagnagrunni..." });
+    
+    const relevantKnowledge = await getRelevantKnowledge(message);
+    console.log(`🔍 Found ${relevantKnowledge.length} relevant knowledge items`);
+    
+    if (relevantKnowledge.length > 0) {
+      console.log(`🔍 Top match (${Math.round(relevantKnowledge[0].similarity * 100)}%): ${relevantKnowledge[0].text.substring(0, 100)}...`);
+      sendEvent({ 
+        type: 'processingStep', 
+        step: `📑 Finn viðeigandi upplýsingar (${relevantKnowledge.length} niðurstöður)` 
+      });
+    } else {
+      sendEvent({ type: 'processingStep', step: "🔍 Leita að fleiri upplýsingum..." });
+    }
+    
+    // Check for calculation intent
+    console.log('🧮 Checking for calculation intent...');
+    sendEvent({ type: 'processingStep', step: "🧮 Athuga hvort þörf sé á útreikningum..." });
+    
+    const calculationIntent = detectCalculationIntent(message);
+    let calculationResult = null;
+    
+    if (calculationIntent) {
+      try {
+        console.log(`🧮 Detected calculation intent: ${calculationIntent.calculationType}`);
+        console.log(`🧮 Calculation parameters:`, calculationIntent.parameters);
+        
+        // Add calculation intent step with Icelandic description
+        sendEvent({ 
+          type: 'processingStep', 
+          step: `🔢 Framkvæmi útreikninga: ${getIcelandicCalculationType(calculationIntent.calculationType)}` 
+        });
+        
+        calculationResult = processCalculation(
+          calculationIntent.calculationType, 
+          calculationIntent.parameters
+        );
+        
+        // Add calculation info to context
+        sessionContext.lastCalculation = {
+          type: calculationIntent.calculationType,
+          parameters: calculationIntent.parameters,
+          result: calculationResult
+        };
+        
+        console.log('🧮 Calculation completed successfully');
+        console.log('🧮 Result summary:', JSON.stringify(calculationResult).substring(0, 200) + '...');
+        
+        // Add calculation result step
+        sendEvent({ type: 'processingStep', step: "✅ Útreikningar kláraðir" });
+      } catch (error) {
+        console.error('🚨 Error in calculation:', error);
+        sendEvent({ type: 'processingStep', step: "⚠️ Villa kom upp í útreikningum" });
+      }
+    }
+    
+    // Generate contextual instruction based on conversation context
+    const contextualInstruction = generateContextualInstruction(sessionContext);
+    console.log('🧠 Contextual instruction:', contextualInstruction);
+    
+    // Generate response using OpenAI
+    console.log('🤖 Generating AI response...');
+    sendEvent({ type: 'processingStep', step: "🤖 Bý til svar með gervigreind..." });
+    
+    const aiStartTime = Date.now();
+    const aiResponse = await generateAIResponse(message, sessionContext, relevantKnowledge, calculationResult, contextualInstruction);
+    const aiEndTime = Date.now();
+    
+    console.log(`🕒 AI response generated in ${aiEndTime - aiStartTime}ms`);
+    console.log(`🤖 Response preview: ${aiResponse.content.substring(0, 100)}...`);
+    
+    sendEvent({ type: 'processingStep', step: "📝 Frumstilli svar..." });
+    
+    // Update context with AI response
+    updateContext(sessionContext, { role: 'assistant', content: aiResponse.content });
+    console.log(`🧠 AI response added to context, total messages: ${sessionContext.messages.length}`);
+    
+    // Periodically update conversation summary after every 5 messages
+    if (sessionContext.messages.length % 5 === 0) {
+      console.log(`🧠 Generating conversation summary...`);
+      sendEvent({ type: 'processingStep', step: "📋 Uppfæri samantekt á samtali..." });
+      await updateConversationSummary(sessionContext);
+      console.log(`🧠 Conversation summary updated: ${sessionContext.conversationSummary.substring(0, 100)}...`);
+    }
+    
+    // Final processing step
+    sendEvent({ type: 'processingStep', step: "✓ Svar tilbúið" });
+    
+    // Save to cache
+    const responseObject = {
+      message: aiResponse.content,
+      calculationResult: calculationResult
+    };
+    responseCache.set(cacheKey, responseObject);
+    console.log(`💾 Response cached with key: ${cacheKey.substring(0, 20)}...`);
+    
+    // Send the complete response
+    sendEvent({ 
+      type: 'complete', 
+      message: aiResponse.content,
+      calculationResult: calculationResult
+    });
+    
+    const endTime = Date.now();
+    console.log(`✅ SSE response generated successfully in ${endTime - startTime}ms`);
+    
+  } catch (error) {
+    console.error('🚨 Error in SSE processing:', error);
+    
+    // Send error to client
+    sendEvent({ 
+      type: 'error', 
+      message: "Því miður kom upp villa. Vinsamlegast reyndu aftur síðar.",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+    
+    // Clean up
+    clearInterval(keepAliveInterval);
   }
 }
